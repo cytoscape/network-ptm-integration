@@ -1,2 +1,4 @@
 # network-ptm-integration
-This repo tracks the work of data-driven addition of phosphorylation sites to proteins in networks (and pathways).
+This repo tracks the work of data-driven addition of phosphorylation sites to proteins in networks (and pathways), through scripts. Rather than visualizing for example phosphoproteomics data on pathways by mapping data to manually curated phospho sites, the idea is to use scripting tools (RCy3) to add sites in a data-driven manner. Phosphosite abundance data could be mapped directly via the parent identifier (UniProt) to the pathway, and sites could be visualized as a typical oval PTM node offset from the parent node. Alternatively (Reuben's idea), data could be visualized as stripes on the node corresponding to domains. The user could choose to visualize all sites in the data or the subset that are relevant to a specific pathway/network based on existing kinases. Kinase-substrate data will be collected from PhosphoSitePlus: https://www.phosphosite.org/staticDownloads.
+
+
