@@ -15,13 +15,13 @@ library(dplyr)
 library(stringr)
 cytoscapePing()
 
-setwd("~/Dropbox (Gladstone)/Work/github/network-ptm-integration/scripts")
+#setwd("~/Dropbox (Gladstone)/Work/github/network-ptm-integration/scripts")
 
 ###############
 ## Read in data
 
 ##Phosphoprotein data
-cptac.data <- read.csv("~/Dropbox (Gladstone)/Work/CPTAC/PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
+cptac.data <- read.csv("../datasets/PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
 cptac.data.brca.pval <- cptac.data %>% filter(BRCA.pval > 0 & BRCA.pval < 0.05) ##dataset specific: keep only rows with data. Change cancer type if necessary.
 # phospho.data <- read.csv("../datasets/Francavilla_PMID28355574_mmc4_phospho.csv", stringsAsFactors = F)
 
@@ -32,7 +32,7 @@ cptac.data.brca.pval <- cptac.data %>% filter(BRCA.pval > 0 & BRCA.pval < 0.05) 
 #   select(Gene.names, AvgExpProtein)
 
 ##Phosphosite kinase-substrate data
-psp.data <- read.csv("~/Dropbox (Gladstone)/Work/CPTAC/network-ptm-integration/CPTAC data downloads/Kinase_Substrate_Dataset.txt", stringsAsFactors = F, sep = "\t")
+psp.data <- read.csv("../datasets/Kinase_Substrate_Dataset.txt", stringsAsFactors = F, sep = "\t")
 psp.data.human<- psp.data %>% filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") #human only, in vivo evidence only
 
 ###############
