@@ -32,7 +32,7 @@ cptac.data.brca.pval <- cptac.data %>% filter(BRCA.pval > 0 & BRCA.pval < 0.05) 
 #   select(Gene.names, AvgExpProtein)
 
 ##Phosphosite kinase-substrate data
-psp.data <- read.csv("../datasets/Kinase_Substrate_Dataset.txt", stringsAsFactors = F, sep = "\t")
+psp.data <- read.csv("../annotations/Kinase_Substrate_Dataset.txt", stringsAsFactors = F, sep = "\t")
 psp.data.human<- psp.data %>% filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") #human only, in vivo evidence only
 
 ###############
@@ -49,12 +49,12 @@ node.table.prot <- subset(node.table, Type == 'Protein' | Type == 'GeneProduct')
 
 ##All matching nodes: Intersection between pathway protein/gene nodes and phospho data
 matching.nodes.prot <- node.table.prot %>% filter(name %in% cptac.data.brca.pval$symbol)
-matching.nodes.phospho <- cptac.data.brca.pval %>% filter(symbol %in% node.table.prot$name)
+matching.nodes.phospho <- cptac.data.brca.pval %>% filter(symbol %in% node.table.prot$name) %>% mutate(comp_id=paste0(symbol, "_", site)) %>% select(BRCA.val, BRCA.pval, symbol, site, comp_id)
 
 #cptac.data.ptm <- cptac.data.pval[cptac.data.pval$symbol %in% ptm.nodes, ] #Relevant subset of phospho data
 #phospho.nodes <- cptac.data.ptm$site 
 
-source.target <- matching.nodes.phospho %>% select(symbol, site)
+source.target <- matching.nodes.phospho %>% select(symbol, comp_id)
 ##Convert to list format that RCy3 expects
 source.target.list <- list() 
 for (i in 1:nrow(source.target)) {
@@ -67,14 +67,14 @@ for (i in 1:nrow(source.target)) {
 kinase.pw <- intersect(psp.data$GENE, node.table.prot$name) #Read in kinase-substrate data
 
 #create temp data frames for comparisons
-psp.data.sub <- psp.data %>% mutate(comp_id=paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>% select(GENE, comp_id)
-cptac.data.sub <- matching.nodes.phospho %>% mutate(comp_id=paste0(symbol, "_", site)) %>% select(symbol, comp_id, site)
+psp.data.sub <- psp.data %>% mutate(comp_id=paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>% select(GENE, SUB_MOD_RSD, comp_id)
+cptac.data.sub <- matching.nodes.phospho %>% mutate(comp_id=paste0(symbol, "_", site)) %>% select(symbol, site, comp_id)
 psp.cptac.sub <- inner_join(psp.data.sub, cptac.data.sub) #combined
 psp.cptac.kin <- psp.cptac.sub[psp.cptac.sub$GENE %in% kinase.pw, ] #subset for only sites with kinases on the pathway
 
 #define phospho site nodes and edges
-phospho.nodes.kin <- psp.cptac.kin$site 
-source.target.kin <- psp.cptac.kin %>% select(symbol, site)
+#phospho.nodes.kin <- psp.cptac.kin$site just use psp.cptac.kin$comp_id instead
+source.target.kin <- psp.cptac.kin %>% select(symbol, comp_id)
 ptm.nodes.kin <- psp.cptac.kin$symbol
 
 ###############
@@ -88,7 +88,7 @@ if (mode == "kinase"){
 }
 
 ##To-Do: Change this to use composite id to make it be always unique
-phospho.suid <- addCyNodes(node.names=matching.nodes.phospho$site, skip.duplicate.names = FALSE) ##phospho sites are not unique
+phospho.suid <- addCyNodes(node.names=matching.nodes.phospho$comp_id, skip.duplicate.names = FALSE) ##phospho sites are not unique
 #addCyNodes(phospho.nodes, skip.duplicate.names = FALSE) ##phospho sites are not unique
 addCyEdges(source.target.list)
 node.table.new <- getTableColumns() #get updated node table
