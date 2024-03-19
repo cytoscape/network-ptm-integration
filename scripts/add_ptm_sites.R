@@ -2,12 +2,9 @@
 if (!requireNamespace("BiocManager", quietly = TRUE)){
   install.packages("BiocManager")
 BiocManager::install("rWikiPathways")
+BiocManager::install("RCy3")
 }
 
-if(!"RCy3" %in% installed.packages()){
-  install.packages("BiocManager")
-  BiocManager::install("RCy3")
-}
 library(rWikiPathways)
 library(RCy3)
 install.packages("dplyr")
@@ -20,20 +17,25 @@ setwd("~/Dropbox (Gladstone)/Work/github/network-ptm-integration/scripts")
 ###############
 ## Read in data
 
-##Phosphoprotein data
+##Phosphoprotein data, add unique id comp_id for each protein/site combination
 cptac.data <- read.csv("../datasets/PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
 cptac.data.brca.pval <- cptac.data %>% 
   mutate(comp_id=paste0(symbol, "_", site)) %>%
   filter(BRCA.pval > 0 & BRCA.pval < 0.05)
 
-##dataset specific: keep only rows with data. Change cancer type if necessary.
-# phospho.data <- read.csv("../datasets/Francavilla_PMID28355574_mmc4_phospho.csv", stringsAsFactors = F)
+##BRCA dataset without NAs
+cptac.data.brca <- cptac.data %>% 
+  mutate(comp_id=paste0(symbol, "_", site)) %>%
+  select(BRCA.val, BRCA.pval, symbol, site) %>%
+  filter(!is.na(BRCA.pval) & !is.na(BRCA.pval))
 
-##Protein data. Rename columns.
-# protein.data <- read.csv("../datasets/Francavilla_PMID28355574_mmc3_protein.csv", stringsAsFactors = F)
-# protein.data.avgexp <- protein.data %>%
-#   dplyr::mutate(AvgExpProtein = AvgExp) %>%
-#   select(Gene.names, AvgExpProtein)
+##Positively regulated with PROGENy
+cptac.data.brca.pos <- cptac.data.brca %>%
+  filter(BRCA.pval > 0 & BRCA.pval < 0.05)
+
+##Negatively regulated with PROGENy
+cptac.data.brca.neg <- cptac.data.brca %>%
+  filter(BRCA.pval > -0.05 & BRCA.pval < 0)
 
 ##Phosphosite kinase-substrate data
 psp.data <- read.csv("../annotations/Kinase_Substrate_Dataset.txt", stringsAsFactors = F, sep = "\t")
@@ -112,7 +114,7 @@ for (p in matching.nodes.prot$SUID_prot){
   #add a node for each
   suids <- addCyNodes(node.names = phospho.nodes$comp_id)
   #suids_2 <- as.data.frame(do.call(rbind, suids)) ##doesn't work
-  #addCyEdges()
+  #addCyEdges() #need the SUID for this
   
   #set node position bypass for phospho nodes
   pos <- 1
@@ -127,24 +129,30 @@ for (p in matching.nodes.prot$SUID_prot){
 
 ##############
 ## Data viz
-style.name = "WikiPathways"
+#Copy current visual style to make new style 
+copyVisualStyle("WikiPathways", "WikiPathways PTM")
+style.name = "WikiPathways PTM"
+setVisualStyle(style.name)
 
-setNodeFontSizeBypass(matching.nodes.phospho$comp_id, 9)
-setNodeWidthBypass(matching.nodes.phospho$comp_id, 50)
-setNodeHeightBypass(matching.nodes.phospho$comp_id, 25)
+setNodeColorDefault('#FFFFFF', style.name = style.name)
+setNodeBorderColorDefault("#737373", style.name = style.name)
 
 ## Update label for phospho nodes
-#To-Do: update ptm node labels. Maybe read in a new column. 
+matching.nodes.phospho.names <- matching.nodes.phospho %>% 
+  select(comp_id, site) %>% 
+  rename(name = site) 
+loadTableData(matching.nodes.phospho.names, data.key.column = "comp_id", table = "node", table.key.column = "shared name") #read in simple site as name for node label
+
+setNodeFontSizeBypass(matching.nodes.phospho$comp_id, 9)
+setNodeWidthBypass(matching.nodes.phospho$site, 40) ##this should use SUID
+setNodeHeightBypass(matching.nodes.phospho$site, 20) ##this should use SUID
 
 #To-Do: use cancer-type specific data (pval) to create mapping via comp_id
-#setNodeColorBypass
+#Define colors based on cutoffs.
+matching.nodes.phospho <- matching.nodes.phospho %>%
+  mutate(color = case_when(BRCA.pval < 0.01 ~ "#FF0000", BRCA.pval > 0.01 ~ "#F496AF"))
+setNodeColorBypass(node.names = matching.nodes.phospho$site, new.colors = matching.nodes.phospho$color)
 
 ## Load protein data
 #loadTableData(protein.data.avgexp,data.key.column="Gene.names", "node", table.key.column = 'name')
 #setNodeCustomHeatMapChart(c("AvgExpProtein"), style.name=style.name)
-
-## Load data as table
-#loadTableData(combined.data.column,data.key.column="node.name", "node", table.key.column = 'name')
-
-## Apply viz
-#setNodeColorMapping('new.avg.exp', colors=paletteColorBrewerRdBu, style.name=style.name)
