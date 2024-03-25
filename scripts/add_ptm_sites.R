@@ -10,149 +10,172 @@ library(RCy3)
 install.packages("dplyr")
 library(dplyr)
 library(stringr)
+library(RColorBrewer)
 cytoscapePing()
-
-setwd("~/Dropbox (Gladstone)/Work/github/network-ptm-integration/scripts")
 
 ###############
 ## Read in data
 
-##Phosphoprotein data, add unique id comp_id for each protein/site combination
-cptac.data <- read.csv("../datasets/PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
-cptac.data.brca.pval <- cptac.data %>% 
-  mutate(comp_id=paste0(symbol, "_", site)) %>%
-  filter(BRCA.pval > 0 & BRCA.pval < 0.05)
+## Phosphoprotein data. Note that this includes NA values. 
+## Add unique id comp_id for each protein/site combination
+cptac.phospho <- read.csv("../datasets/CPTAC_phospho_tn.txt", stringsAsFactors = F, sep = "\t")
+cptac.phospho <- cptac.phospho %>% 
+  mutate(comp_id=paste0(symbol, "_", site))
 
-##BRCA dataset without NAs
-cptac.data.brca <- cptac.data %>% 
-  mutate(comp_id=paste0(symbol, "_", site)) %>%
-  select(BRCA.val, BRCA.pval, symbol, site) %>%
-  filter(!is.na(BRCA.pval) & !is.na(BRCA.pval))
+## Extracting phospho data for one cancer type - CCRC example
+## CCRC phosphoprotein abundance dataset without NAs
+cptac.phospho.ccrcc <- cptac.phospho %>% 
+  select(symbol, site, protein, comp_id, CCRCC.val, CCRCC.pval) %>%
+  filter(!is.na(CCRCC.pval) & !is.na(CCRCC.pval))
 
-##Positively regulated with PROGENy
-cptac.data.brca.pos <- cptac.data.brca %>%
-  filter(BRCA.pval > 0 & BRCA.pval < 0.05)
+cptac.phospho.ccrcc.sig <- cptac.phospho.ccrcc %>% 
+  filter(CCRCC.pval > 0 & CCRCC.pval < 0.05)
 
-##Negatively regulated with PROGENy
-cptac.data.brca.neg <- cptac.data.brca %>%
-  filter(BRCA.pval > -0.05 & BRCA.pval < 0)
+## PROGENy EGFR pathway correlated data. Not sure we need this.
+cptac.progeny.egfr <- read.csv("../datasets/CPTAC_PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
+cptac.progeny.egfr <- cptac.progeny.egfr %>% 
+  mutate(comp_id=paste0(symbol, "_", site))
 
-##Phosphosite kinase-substrate data
+## Positively regulated PROGEny EGFR pathway and CCRC
+cptac.egfr.ccrcc.pos <- cptac.progeny.egfr %>%
+  filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) ##Automatically gets rid of NAs
+
+## Negatively regulated PROGEny EGFR pathway and CCRC
+cptac.egfr.ccrcc.neg <- cptac.progeny.egfr %>%
+  filter(CCRCC.pval > -0.05 & CCRCC.pval < 0)
+
+## Protein data. Note that this includes NA values.
+cptac.protein <- read.csv("../datasets/CPTAC_protein_tn.txt", stringsAsFactors = F, sep = "\t")
+
+## Extracting protein data for one cancer type - CCRC example
+## CCRC protein dataset without NAs
+cptac.protein.ccrcc <- cptac.protein %>% 
+  select(ensembl, symbol, CCRCC.val, CCRCC.pval) %>%
+  filter(!is.na(CCRCC.pval) & !is.na(CCRCC.pval))
+
+## Phosphosite kinase-substrate data
 psp.data <- read.csv("../annotations/Kinase_Substrate_Dataset.txt", stringsAsFactors = F, sep = "\t")
-psp.data.human<- psp.data %>% filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") #human only, in vivo evidence only
+psp.data.human<- psp.data %>%
+  filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X")  %>% 
+  mutate(comp_id=paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>%
+  select(GENE, comp_id, SUBSTRATE, SUB_MOD_RSD) #human only, in vivo evidence only
 
 ###############
-##Open and process WP, get relevant phospho data nodes and cross-check against kinase-substrate data
+## Open and process WP, get relevant phospho data nodes and cross-check against kinase-substrate data
 RCy3::commandsRun('wikipathways import-as-pathway id=WP4806') 
+## Remove existing ptm states from nodes. These are encoded as nodes with the label P.
+selectNodes(nodes = "p", by.col = "name", preserve.current.selection = FALSE) 
+deleteSelectedNodes()
+
 mode <- "all"
 
-##Get all relevant data nodes in pathway
-node.table <- getTableColumns()
+## Get all relevant protein/gene product data nodes in pathway
+node.table <- RCy3::getTableColumns(table = "node")
 node.table.prot <- subset(node.table, Type == 'Protein' | Type == 'GeneProduct') %>%
   select(SUID, name, XrefId, Ensembl) ##get node table entries for relevant nodes
 
-##All matching nodes: Intersection between pathway protein/gene nodes and phospho data
+## All matching nodes: Intersection between pathway protein/gene nodes and phospho data
+## These are the nodes we are going to add phospho nodes to
 matching.nodes.prot <- node.table.prot %>% 
-  filter(name %in% cptac.data.brca.pval$symbol) %>% 
-  rename(SUID_prot = SUID) %>% 
-  rename(symbol = name) %>%
-  select(SUID_prot, symbol) #these are the nodes we are going to add sites to
+  filter(name %in% cptac.phospho.ccrcc.sig$symbol) %>% 
+  select(SUID, name) 
 
-#need this for matching with kinase substrate data
-matching.nodes.phospho <- cptac.data.brca.pval %>%
+## Need this for matching with kinase substrate data
+matching.nodes.phospho <- cptac.phospho.ccrcc.sig %>%
   filter(symbol %in% node.table.prot$name) %>%
   mutate(comp_id=paste0(symbol, "_", site)) %>%
-  select(symbol, site, comp_id, BRCA.val, BRCA.pval)
-# 
-# matching.nodes.final <- merge(matching.nodes.prot, matching.nodes.phospho)
-
-# summarized <- matching.nodes.final %>% group_by(SUID_prot) %>% 
-#   summarize(site = paste(sort(unique(site)),collapse=","))
-
-matching.nodes.prot.final <- merge(matching.nodes.prot, summarized)
+  select(symbol, site, comp_id, CCRCC.val, CCRCC.pval)
 
 ###############
-##Only those with kinases on pathway: Subset of matching nodes with relevant kinases in the pathway
-##To-Do: need to refactor for alt strategy
-kinase.pw <- intersect(psp.data$GENE, node.table.prot$name) #Read in kinase-substrate data
+## Only those sites with kinases on pathway: Subset of matching nodes with relevant kinases in the pathway
+## To-Do: need to refactor for alt strategy
+kinase.pw <- intersect(psp.data.human$GENE, node.table.prot$name) #Kinases on pathway
 
-#create temp data frames for comparisons
-psp.data.sub <- psp.data %>% mutate(comp_id=paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>% select(GENE, SUB_MOD_RSD, comp_id)
-cptac.data.sub <- matching.nodes.phospho %>% mutate(comp_id=paste0(symbol, "_", site)) %>% select(symbol, site, comp_id)
-psp.cptac.sub <- inner_join(psp.data.sub, cptac.data.sub) #combined
-psp.cptac.kin <- psp.cptac.sub[psp.cptac.sub$GENE %in% kinase.pw, ] #subset for only sites with kinases on the pathway
+phospho.psp.kin <- inner_join(matching.nodes.phospho, psp.data.human) %>%
+  filter(GENE %in% kinase.pw)
 
-#define phospho site nodes and edges
-source.target.kin <- psp.cptac.kin %>% select(symbol, comp_id)
-ptm.nodes.kin <- psp.cptac.kin$symbol
-
-#If mode is "kinase only", update inputs
-if (mode == "kinase"){
-  phospho.nodes <- phospho.nodes.kin
-  source.target <- source.target.kin
-  ptm.nodes <- ptm.nodes.kin
-}
 ###############
-##Adding phospho nodes to pathway
+## Adding phospho nodes to pathway
 
 ##Alt strategy: Add phospho nodes by looping through protein nodes
-#p <- "38082" #testing
-for (p in matching.nodes.prot$SUID_prot){
-  prot <- matching.nodes.prot$symbol[matching.nodes.prot$SUID_prot == p]
-  #get node position for protein node
+
+## If mode is "kinase only", update inputs
+if (mode == "kinase"){
+  site.table <- phospho.psp.kin
+}
+
+site.table <- cptac.phospho.ccrcc.sig
+ptms.all <- data.frame()
+
+for (p in matching.nodes.prot$SUID){
+  print(p)
+  prot <- matching.nodes.prot$name[matching.nodes.prot$SUID == p]
+  print(prot)
+  #Get node position for protein node
   p.position <- getNodePosition(node.names = p) #requires node name
-  #calculate possible phospho site positions, limit to 4 sites
+  #Calculate possible phospho site positions, limit to 4 sites for now.
   phospho.positions <- data.frame()
   pos.x <- p.position$x_location
   pos.y <- p.position$y_location
   phospho.positions <- data.frame(position=1:4, x=c(pos.x+30, pos.x+30, pos.x-30, pos.x-30), y=c(pos.y+10, pos.y-10, pos.y-10, pos.y+10))
   
-  #find relevant subset of cptac data
-  phospho.nodes <- cptac.data.brca.pval %>% 
-    filter(symbol == prot)
+  #find relevant subset of cptac phospho data, these are the ptm nodes to add
+  phospho.nodes <- site.table %>% 
+    filter(symbol == prot) %>% 
+    select(comp_id)
+  print(phospho.nodes)
+  phospho.nodes <- head(phospho.nodes, 4) ##take first 4
   
-  #add a node for each
-  suids <- addCyNodes(node.names = phospho.nodes$comp_id)
-  #suids_2 <- as.data.frame(do.call(rbind, suids)) ##doesn't work
-  #addCyEdges() #need the SUID for this
+  ##Add a node for each ptm, for the particular protein. Collect the SUID for the added ptm, and use it for updating position below.
+  ##To-Do: Record all added SUIDs here, which will be useful later for updating visual style for ONLY phospho nodes.
+  suids <- addCyNodes(node.names = phospho.nodes$comp_id, skip.duplicate.names = FALSE)
+  ptms <- data.frame()
+  for (l in suids){
+    ptms <- rbind(ptms, l)
+  }
   
-  #set node position bypass for phospho nodes
+  ##Set node position bypass for ptm nodes. Use 4 sites on each node.
+  ##This doesn't work right, needs the SUIDs.
   pos <- 1
-  for (ptm in phospho.nodes$comp_id){
-    print(pos)
+  #for (ptm in phospho.nodes$comp_id){
+  for (ptm in ptms$SUID){
+    addCyEdges(c(p, ptm)) #need the SUID for this
     x <- subset(phospho.positions, position == pos)$x
     y <- subset(phospho.positions, position == pos)$y
+    print(x)
+    print(y)
     setNodePositionBypass(ptm, x, y)
     pos <- pos+1
   }
+  
+  ptms.all <- rbind(ptms.all, ptms)
 }
 
 ##############
 ## Data viz
-#Copy current visual style to make new style 
-copyVisualStyle("WikiPathways", "WikiPathways PTM")
-style.name = "WikiPathways PTM"
-setVisualStyle(style.name)
+style.name = "WikiPathways"
+
+## Load protein data and visualize as node color. Details of this will depend on what the data is, current test data is pval.
+loadTableData(cptac.protein,data.key.column="symbol", "node", table.key.column = 'shared name')
+RCy3::setNodeColorMapping('CCRCC.pval', colors=paletteColorBrewerReds, style.name = style.name) 
 
 setNodeColorDefault('#FFFFFF', style.name = style.name)
 setNodeBorderColorDefault("#737373", style.name = style.name)
+ 
+## Update style for ptm nodes.
+setNodeFontSizeBypass(ptms.all$SUID, 9)
+setNodeWidthBypass(ptms.all$SUID, 40) ##doesn't work
+setNodeHeightBypass(ptms.all$SUID, 20) ##doesn't work
+#to-do: bring phospho nodes to the front. not sure if this is possible with RCy3
 
-## Update label for phospho nodes
-matching.nodes.phospho.names <- matching.nodes.phospho %>% 
-  select(comp_id, site) %>% 
-  rename(name = site) 
-loadTableData(matching.nodes.phospho.names, data.key.column = "comp_id", table = "node", table.key.column = "shared name") #read in simple site as name for node label
-
-setNodeFontSizeBypass(matching.nodes.phospho$comp_id, 9)
-setNodeWidthBypass(matching.nodes.phospho$site, 40) ##this should use SUID
-setNodeHeightBypass(matching.nodes.phospho$site, 20) ##this should use SUID
+##To-Do: Update label for phospho nodes
+##Need to make a new column with just the site, then read in as "name" column
 
 #To-Do: use cancer-type specific data (pval) to create mapping via comp_id
 #Define colors based on cutoffs.
+test <- inner_join(ptms.all, matching.nodes.phospho, by = join_by(name == comp_id))
 matching.nodes.phospho <- matching.nodes.phospho %>%
-  mutate(color = case_when(BRCA.pval < 0.01 ~ "#FF0000", BRCA.pval > 0.01 ~ "#F496AF"))
-setNodeColorBypass(node.names = matching.nodes.phospho$site, new.colors = matching.nodes.phospho$color)
+  mutate(color = case_when(CCRCC.pval < 0.01 ~ "#FF0000", CCRCC.pval > 0.01 ~ "#F496AF"))
+setNodeColorBypass(node.names = test$SUID, new.colors = test$color)
 
-## Load protein data
-#loadTableData(protein.data.avgexp,data.key.column="Gene.names", "node", table.key.column = 'name')
-#setNodeCustomHeatMapChart(c("AvgExpProtein"), style.name=style.name)
+
