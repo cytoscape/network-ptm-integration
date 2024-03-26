@@ -74,7 +74,7 @@ node.table <- RCy3::getTableColumns(table = "node")
 node.table.prot <- subset(node.table, Type == 'Protein' | Type == 'GeneProduct') %>%
   select(SUID, name, XrefId, Ensembl) ##get node table entries for relevant nodes. not sure we need this
 
-## All matching nodes: Intersection between pathway protein/gene nodes and phospho data
+## All matching nodes: Intersection between pathway protein/gene nodes and significant phospho data
 ## These are the nodes we are going to add phospho nodes to.
 matching.nodes.prot <- node.table.prot %>% 
   filter(name %in% cptac.phospho.ccrcc.sig$symbol) %>% 
@@ -84,7 +84,7 @@ matching.nodes.prot <- node.table.prot %>%
 matching.nodes.phospho <- cptac.phospho.ccrcc.sig %>%
   filter(symbol %in% node.table.prot$name) %>%
   mutate(comp_id=paste0(symbol, "_", site)) %>%
-  select(symbol, site, comp_id, CCRCC.val, CCRCC.pval)
+  select(symbol, site, comp_id)
 
 ###############
 ## Only those sites with kinases on pathway: Subset of matching nodes with relevant kinases in the pathway
@@ -92,15 +92,14 @@ matching.nodes.phospho <- cptac.phospho.ccrcc.sig %>%
 kinase.pw <- intersect(psp.data.human$GENE, node.table.prot$name) #Kinases on pathway. GENE column contains kinase.
 
 ## Overlap between phospho nodes and kinase-substrate data, where the kinase (GENE) is on the pathway
-phospho.psp.kin <- inner_join(matching.nodes.phospho, psp.data.human) %>%
-  filter(GENE %in% kinase.pw) 
+matching.nodes.phospho.kin <- inner_join(matching.nodes.phospho, psp.data.human) %>%
+  filter(GENE %in% kinase.pw) %>%
+  select(symbol, comp_id, site)
 
-phospho.psp.kin.sites <- phospho.psp.kin %>%
-  select(symbol, comp_id, CCRCC.val, CCRCC.pval) 
+matching.nodes.phospho.kin.sites <- matching.nodes.phospho.kin %>%
+  select(symbol, comp_id) 
 
-phospho.psp.kin.sites <- distinct(phospho.psp.kin.sites)
-
-#mode <- "kinase"
+mode <- "kinase"
 ###############
 ## Adding phospho nodes to pathway
 
@@ -110,7 +109,7 @@ site.table <- matching.nodes.phospho
 
 ## If mode is "kinase only", update inputs
 if (mode == "kinase"){
-  site.table <- phospho.psp.kin.sites
+  site.table <- matching.nodes.phospho.kin.sites
 }
 
 ptms.all <- data.frame()
@@ -132,13 +131,12 @@ for (p in matching.nodes.prot$SUID){
   phospho.nodes <- site.table %>% 
     filter(symbol == prot) %>% 
     select(comp_id)
-  print(phospho.nodes)
   phospho.nodes <- head(phospho.nodes, 4) ##take first 4
   
   ##Add a node for each ptm, for the particular protein. Collect the SUID for the added ptm, and use it for updating position below.
   suids <- addCyNodes(node.names = phospho.nodes$comp_id, skip.duplicate.names = FALSE)
   ptms <- data.frame()
-  # ptms <- do.call(rbind, suids) doesnt work
+  # ptms <- do.call(rbind, suids) #doesnt work
   
   for (l in suids){
     ptms <- rbind(ptms, l)
@@ -165,7 +163,7 @@ style.name = "WikiPathways"
 
 ## Load protein data and visualize as node color. Details of this will depend on what the data is, current test data is pval.
 
-loadTableData(cptac.protein,data.key.column="symbol", "node", table.key.column = 'shared name')
+loadTableData(cptac.protein, data.key.column="symbol", "node", table.key.column = 'shared name')
 RCy3::setNodeColorMapping('CCRCC.pval', colors=paletteColorBrewerReds, style.name = style.name) 
 
 setNodeColorDefault('#FFFFFF', style.name = style.name)
@@ -180,9 +178,11 @@ setNodeHeightBypass(ptms.all$SUID, 20)
 ## Define colors based on cutoffs, set as defalut node fill, update phospho node label
 ptms.all.data <- inner_join(ptms.all, matching.nodes.phospho, by = join_by(name == comp_id)) %>% 
   mutate(color = case_when(CCRCC.pval < 0.01 ~ "#FF0000", CCRCC.pval > 0.01 ~ "#F496AF"))
+
 ptms.all.data.site <- ptms.all.data %>%
   select(SUID, site) %>%
   rename(name = site)
+
 loadTableData(ptms.all.data.site,data.key.column="SUID", "node", table.key.column = "SUID")
 setNodeColorBypass(node.names = ptms.all.data$SUID, new.colors = ptms.all.data$color)
 
