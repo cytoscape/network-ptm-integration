@@ -93,19 +93,24 @@ kinase.pw <- intersect(psp.data.human$GENE, node.table.prot$name) #Kinases on pa
 
 ## Overlap between phospho nodes and kinase-substrate data, where the kinase (GENE) is on the pathway
 phospho.psp.kin <- inner_join(matching.nodes.phospho, psp.data.human) %>%
-  filter(GENE %in% kinase.pw)
+  filter(GENE %in% kinase.pw) 
+
+phospho.psp.kin.sites <- phospho.psp.kin %>%
+  select(symbol, comp_id, CCRCC.val, CCRCC.pval) 
+
+phospho.psp.kin.sites <- distinct(phospho.psp.kin.sites)
 
 #mode <- "kinase"
 ###############
 ## Adding phospho nodes to pathway
 
-##Alt strategy: Add phospho nodes by looping through protein nodes
+## Add phospho nodes by looping through relevant protein nodes
 
 site.table <- matching.nodes.phospho
 
 ## If mode is "kinase only", update inputs
 if (mode == "kinase"){
-  site.table <- phospho.psp.kin
+  site.table <- phospho.psp.kin.sites
 }
 
 ptms.all <- data.frame()
@@ -113,7 +118,7 @@ ptms.all <- data.frame()
 for (p in matching.nodes.prot$SUID){
   prot <- matching.nodes.prot$name[matching.nodes.prot$SUID == p]
   #Get node position for protein node
-  p.position <- getNodePosition(node.names = p) #requires node name
+  p.position <- getNodePosition(node.names = p)
   #Calculate possible phospho site positions, limit to 4 sites for now.
   phospho.positions <- data.frame()
   pos.x <- p.position$x_location
@@ -130,6 +135,8 @@ for (p in matching.nodes.prot$SUID){
   ##Add a node for each ptm, for the particular protein. Collect the SUID for the added ptm, and use it for updating position below.
   suids <- addCyNodes(node.names = phospho.nodes$comp_id, skip.duplicate.names = FALSE)
   ptms <- data.frame()
+  # ptms <- do.call(rbind, suids) doesnt work
+  
   for (l in suids){
     ptms <- rbind(ptms, l)
   }
@@ -154,8 +161,9 @@ for (p in matching.nodes.prot$SUID){
 style.name = "WikiPathways"
 
 ## Load protein data and visualize as node color. Details of this will depend on what the data is, current test data is pval.
+
 loadTableData(cptac.protein,data.key.column="symbol", "node", table.key.column = 'shared name')
-RCy3::setNodeColorMapping('CCRCC.pval', colors=paletteColorBrewerBlues(), style.name = style.name) 
+RCy3::setNodeColorMapping('CCRCC.pval', colors=paletteColorBrewerReds(), style.name = style.name) 
 
 setNodeColorDefault('#FFFFFF', style.name = style.name)
 setNodeBorderColorDefault("#737373", style.name = style.name)
@@ -166,12 +174,12 @@ setNodeWidthBypass(ptms.all$SUID, 40)
 setNodeHeightBypass(ptms.all$SUID, 20)
 #to-do: bring phospho nodes to the front. not sure if this is possible with RCy3
 
-##To-Do: Update label for phospho nodes
-##Need to make a new column with just the site, then read in as "name" column
-
 ## Define colors based on cutoffs.
 ptms.all.data <- inner_join(ptms.all, matching.nodes.phospho, by = join_by(name == comp_id)) %>% 
   mutate(color = case_when(CCRCC.pval < 0.01 ~ "#FF0000", CCRCC.pval > 0.01 ~ "#F496AF"))
 setNodeColorBypass(node.names = ptms.all.data$SUID, new.colors = ptms.all.data$color)
+
+##To-Do: Update label for phospho nodes
+##Need to make a new column with just the site, then read in as "name" column
 
 
