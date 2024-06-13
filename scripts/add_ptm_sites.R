@@ -1,18 +1,24 @@
 ## Setup
 if (!requireNamespace("BiocManager", quietly = TRUE)){
-  install.packages("BiocManager")
+  install.packages("BiocManager")}
+
 BiocManager::install("rWikiPathways")
 BiocManager::install("RCy3")
-}
+#BiocManager::install("BridgeDbR")
+#install.packages("biomaRt")
+install.packages("dplyr")
 
 library(rWikiPathways)
 library(RCy3)
-install.packages("dplyr")
 library(dplyr)
 library(stringr)
 library(RColorBrewer)
 library(purrr)
+#library('biomaRt')
 cytoscapePing()
+
+##Change working dir for local dev. Adjust path based on setup.
+setwd("~/Dropbox (Gladstone)/Work/github/network-ptm-integration/scripts")
 
 ###############
 ## Read in data
@@ -31,19 +37,6 @@ cptac.phospho.ccrcc <- cptac.phospho %>%
 
 cptac.phospho.ccrcc.sig <- cptac.phospho.ccrcc %>% 
   filter(CCRCC.pval > 0 & CCRCC.pval < 0.05)
-
-# ## PROGENy EGFR pathway correlated data. Not sure we need this.
-# cptac.progeny.egfr <- read.csv("../datasets/CPTAC_PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
-# cptac.progeny.egfr <- cptac.progeny.egfr %>% 
-#   mutate(comp_id=paste0(symbol, "_", site))
-# 
-# ## Positively regulated PROGEny EGFR pathway and CCRC
-# cptac.egfr.ccrcc.pos <- cptac.progeny.egfr %>%
-#   filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) ##Automatically gets rid of NAs
-# 
-# ## Negatively regulated PROGEny EGFR pathway and CCRC
-# cptac.egfr.ccrcc.neg <- cptac.progeny.egfr %>%
-#   filter(CCRCC.pval > -0.05 & CCRCC.pval < 0)
 
 ## Protein data. Note that this includes NA values.
 ## The p-values and "val" statistics are from Wilcoxon rank sum test. Positive values means abundance is higher in tumor.
@@ -74,14 +67,23 @@ deleteSelectedNodes()
 mode <- "all"
 
 ## Get all relevant protein/gene product data nodes in pathway
+
 node.table <- RCy3::getTableColumns(table = "node")
 node.table.prot <- subset(node.table, Type == 'Protein' | Type == 'GeneProduct') %>%
   select(SUID, name, XrefId, Ensembl) ##get node table entries for relevant nodes. not sure we need this
 
+## Map from Ensembl to HGNC, use HGNC to match with data (gene symbol). Note: the mapping should really be to Ensembl peptide ids.
+mapped.cols <- mapTableColumn('Ensembl','Human','Ensembl','HGNC') ##works directly on the node table in Cytoscape
+mapped.cols <- mapped.cols %>% 
+  filter(!is.na(Ensembl) & !is.na(HGNC)) %>% 
+  distinct()
+
+node.table.prot <- merge(mapped.cols, node.table.prot, by="Ensembl", all=FALSE)
+
 ## All matching nodes: Intersection between pathway protein/gene nodes and significant phospho data
 ## These are the nodes we are going to add phospho nodes to.
 matching.nodes.prot <- node.table.prot %>% 
-  filter(name %in% cptac.phospho.ccrcc.sig$symbol) %>% 
+  filter(HGNC %in% cptac.phospho.ccrcc.sig$symbol) %>% 
   select(SUID, name) 
 
 ##Get position for all relevant protein nodes, store as data frame
@@ -99,16 +101,12 @@ node.height <- as.data.frame(node.height)
 node.height <- cbind(suid = rownames(node.height), node.height)
 rownames(node.height) <- 1:nrow(node.height)
 
-#test_df <- bind_rows(node.positions, node.widths, node.heights)
 node.layout <- merge(node.width, node.height, by="suid")
 node.layout <- merge(node.layout, node.positions, by="suid")
 
 ##To-Do: add the different phospho node options to node.layout
-#phospho.positions <- data.frame()
 pos.x <- p.position$x_location 
 pos.y <- p.position$y_location
-#phospho.positions <- data.frame(position=1:4, x=c(pos.x+40, pos.x+40, pos.x-40, pos.x-40), y=c(pos.y+10, pos.y-10, pos.y-10, pos.y+10))
-#phospho.positions <- data.frame(position=1:4, x=c(pos.x+(p.width/2)+16, pos.x+(p.width/2)+16, pos.x-(p.width/2)-16, pos.x-(p.width/2)-16), y=c(pos.y+(p.height/2), pos.y-(p.height/2), pos.y-(p.height/2), pos.y+(p.height/2)))
 
 #Calculate and add x and y pos for traditional ptm viz. Use 4 sites on each node.
 node.layout <- node.layout %>%
