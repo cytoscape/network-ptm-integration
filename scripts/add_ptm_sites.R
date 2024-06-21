@@ -48,18 +48,21 @@ cptac.protein.ccrcc <- cptac.protein %>%
   select(ensembl, symbol, CCRCC.val, CCRCC.pval) %>%
   filter(!is.na(CCRCC.pval) & !is.na(CCRCC.pval))
 
-## PROGENy EGFR pathway correlated data. Not sure we need this.
+## PROGENy EGFR pathway correlated data.
+## cohort.val:pearman correlation; coefficient and cohort.pval:p-value
 cptac.progeny.egfr <- read.csv("../datasets/CPTAC_PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
 cptac.progeny.egfr <- cptac.progeny.egfr %>% 
   mutate(comp_id=paste0(symbol, "_", site))
 
 ## Positively regulated PROGEny EGFR pathway and CCRC
 cptac.egfr.ccrcc.pos <- cptac.progeny.egfr %>%
-  filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) ##Automatically gets rid of NAs
+  filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) %>%
+  select(symbol, protein, site, comp_id, CCRCC.val, CCRCC.pval) ##Automatically gets rid of NAs
 
 ## Negatively regulated PROGEny EGFR pathway and CCRC
 cptac.egfr.ccrcc.neg <- cptac.progeny.egfr %>%
-  filter(CCRCC.pval > -0.05 & CCRCC.pval < 0)
+  filter(CCRCC.pval > -0.05 & CCRCC.pval < 0) %>%
+  select(symbol, protein, site, comp_id, CCRCC.val, CCRCC.pval)
 
 ## Phosphosite kinase-substrate data
 psp.data <- read.csv("../annotations/Kinase_Substrate_Dataset.txt", stringsAsFactors = F, sep = "\t")
@@ -73,6 +76,7 @@ psp.data.human<- psp.data %>%
 ## add loop for multiple pathways here
 ## Open and process WP, get relevant phospho data nodes and cross-check against kinase-substrate data
 RCy3::commandsRun('wikipathways import-as-pathway id=WP4806') 
+
 ## Remove existing ptm states from nodes. These are encoded as nodes with the label P.
 selectNodes(nodes = "p", by.col = "name", preserve.current.selection = FALSE) 
 deleteSelectedNodes()
