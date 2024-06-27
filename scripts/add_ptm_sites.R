@@ -214,35 +214,37 @@ for (p in matching.nodes.prot$SUID){
 ##############
 ## Data viz
 style.name = "WikiPathways"
-
-## Load protein data and visualize as node color. Details of this will depend on what the data is, current test data is "val".
-
-loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
-#loadTableData(cptac.phospho.ccrcc, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
-loadTableData(cptac.egfr.ccrcc.pos, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
-RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
-
 setNodeColorDefault('#FFFFFF', style.name = style.name)
 setNodeBorderColorDefault("#737373", style.name = style.name)
- 
-## Update style for ptm nodes.
-setNodeFontSizeBypass(ptms.all$SUID, 9)
-setNodeWidthBypass(ptms.all$SUID, 35) 
-setNodeHeightBypass(ptms.all$SUID, 20)
-#to-do: bring phospho nodes to the front. not sure if this is possible with RCy3
 
-## Define colors based on cutoffs, set as default node fill, update phospho node label
-# ptms.all.data <- inner_join(ptms.all, cptac.phospho.ccrcc.sig, by = join_by(name == symbol_site)) %>%
-#   mutate(color = case_when(CCRCC.pval < 0.01 ~ "#f06262", CCRCC.pval > 0.01 ~ "#f0a3a3"))
+## Load protein data and visualize as node color.
+## Alt 1: Visualize CPTAC protein and CPTAC phospho data on node fill for protein and ptm nodes.
+## For this we can use the same visualization since the value is the same, Wilcoxon rank sum test
 
-ptms.all.data <- inner_join(ptms.all, cptac.phospho.ccrcc.sig, by = join_by(name == symbol_site))
+loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
+loadTableData(cptac.phospho.ccrcc, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
+RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
+
+## Alt 2: Visualize CPTAC protein on protein node, and PROGENy data on ptm nodes.
+## Since the data is different (Wilcoxon vs Spearman correlation), the ptm node color will be done via bypass.
+
+loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
+loadTableData(cptac.egfr.ccrcc.pos, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
+RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) ##we will overwrite ptm node color later
+
+ptms.all.data <- inner_join(ptms.all, cptac.egfr.ccrcc.pos, by = join_by(name == symbol_site)) %>%
+  mutate(color = case_when(CCRCC.val > 0.5 ~ "#f06262", CCRCC.val < 0.5 ~ "#f0a3a3", CCRCC.val == 0.5 ~ "#f0a3a3"))
+setNodeColorBypass(node.names = ptms.all.data$SUID, new.colors = ptms.all.data$color)
 
 ptms.all.data.site <- ptms.all.data %>%
   select(SUID, site) %>%
   rename(name = site)
 
 loadTableData(ptms.all.data.site,data.key.column="SUID", "node", table.key.column = "SUID")
-#setNodeColorBypass(node.names = ptms.all.data$SUID, new.colors = ptms.all.data$color)
-clearNodePropertyBypass(node.names = ptms.all.data$SUID, visual.property = NODE_PAINT)
 
+## Update style for ptm nodes.
+setNodeFontSizeBypass(ptms.all$SUID, 9)
+setNodeWidthBypass(ptms.all$SUID, 35) 
+setNodeHeightBypass(ptms.all$SUID, 20)
+#to-do: bring phospho nodes to the front. not sure if this is possible with RCy3
 
