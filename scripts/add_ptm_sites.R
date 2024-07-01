@@ -21,45 +21,44 @@ cytoscapePing()
 setwd("~/Dropbox (Gladstone)/Work/github/network-ptm-integration/scripts")
 
 ###############
-## Read in data
+## Read in data files
 
-## Phosphoprotein data. Note that this includes NA values. 
+## Phosphoprotein data from CPTAC. Note that this includes NA values. 
+## The "pval" and "val" statistics are from Wilcoxon rank sum test. Positive values means abundance is higher in tumor.
 ## Add unique id symbol_site for each protein/site combination
 cptac.phospho <- read.csv("../datasets/CPTAC_phospho_tn.txt", stringsAsFactors = F, sep = "\t")
 cptac.phospho <- cptac.phospho %>% 
   mutate(symbol_site=paste0(symbol, "_", site))
 
-## Extracting phospho data for one cancer type - CCRCC example
-## The "pval" and "val" statistics are from Wilcoxon rank sum test. Positive values means abundance is higher in tumor.
-## Select significant rows based on p-value
+## Extracting phospho data for one cancer type: CCRCC
+## Select significant rows based on significant p-value in CCRCC vs control
 cptac.phospho.ccrcc.sig <- cptac.phospho %>% 
   filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) %>%
   select(symbol, site, protein, symbol_site, CCRCC.val, CCRCC.pval)
 
-## PROGENy EGFR pathway correlated data. Use this data to select the most interesting phospho sites for the EGFR pathway, WP4806.
+## PROGENy EGFR pathway correlated phospho data. 
+## Sites are either positively correlated with the EGFR pathway (contributing to pathway activity), or negatively correlated (inhibitory) 
 ## cohort.val: Spearman correlation coefficient;  cohort.pval: p-value
 cptac.progeny.egfr <- read.csv("../datasets/CPTAC_PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
-cptac.progeny.egfr <- cptac.progeny.egfr %>% 
-  mutate(symbol_site=paste0(symbol, "_", site))
 
-## Positively regulated PROGEny EGFR pathway and CCRCC
-cptac.egfr.ccrcc.pos <- cptac.progeny.egfr %>%
+## Positively regulated PROGENy EGFR pathway and CCRCC
+## To-Do: Not sure how to filter this data using val and pval
+cptac.progeny.egfr.ccrcc.pos <- cptac.progeny.egfr %>%
   filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) %>%
-  select(symbol, protein, site, symbol_site, CCRCC.val, CCRCC.pval) ##Automatically gets rid of NAs
+  mutate(symbol_site=paste0(symbol, "_", site)) %>% 
+  select(symbol, protein, site, symbol_site, CCRCC.val, CCRCC.pval) 
 
-## Negatively regulated PROGEny EGFR pathway and CCRCC
-cptac.egfr.ccrcc.neg <- cptac.progeny.egfr %>%
+## Negatively regulated PROGENy EGFR pathway and CCRCC
+cptac.progeny.egfr.ccrcc.neg <- cptac.progeny.egfr %>%
   filter(CCRCC.pval > -0.05 & CCRCC.pval < 0) %>%
+  mutate(symbol_site=paste0(symbol, "_", site)) %>%
   select(symbol, protein, site, symbol_site, CCRCC.val, CCRCC.pval)
-
-## Alternative: select phosphosite data from CPTAC PHOSPHO based on PROGENy score 
 
 ## Protein data from CPTAC. Note that this includes NA values.
 ## The "pval" and "val" statistics are from Wilcoxon rank sum test. Positive values means abundance is higher in tumor.
 cptac.protein <- read.csv("../datasets/CPTAC_protein_tn.txt", stringsAsFactors = F, sep = "\t")
 
-## Extracting protein data for one cancer type - CCRCC example
-## CCRC protein dataset without NAs
+## Extracting protein data for one cancer type: CCRCC
 cptac.protein.ccrcc <- cptac.protein %>% 
   select(ensembl, symbol, CCRCC.val, CCRCC.pval) %>%
   filter(!is.na(CCRCC.pval) & !is.na(CCRCC.pval))
@@ -72,8 +71,6 @@ psp.data.human<- psp.data %>%
   select(GENE, symbol_site, SUBSTRATE, SUB_MOD_RSD) #human only, in vivo evidence only
 
 ###############
-
-## add loop for multiple pathways here
 ## Open and process WP, get relevant phospho data nodes and cross-check against kinase-substrate data
 RCy3::commandsRun('wikipathways import-as-pathway id=WP4806') 
 
@@ -81,13 +78,13 @@ RCy3::commandsRun('wikipathways import-as-pathway id=WP4806')
 selectNodes(nodes = "p", by.col = "name", preserve.current.selection = FALSE) 
 deleteSelectedNodes()
 
+## Default mode is "all", meaning add all ptms from the data regardless if the kinase is on the pathway or not.
 mode <- "all"
 
 ## Get all relevant protein/gene product data nodes in pathway
-
 node.table <- RCy3::getTableColumns(table = "node")
 node.table.prot <- subset(node.table, Type == 'Protein' | Type == 'GeneProduct') %>%
-  select(SUID, name, XrefId, Ensembl) ##get node table entries for relevant nodes. not sure we need this
+  select(SUID, name, XrefId, Ensembl)
 
 ## Map from Ensembl to HGNC, use HGNC to match with data (gene symbol). Note: the mapping should really be to Ensembl peptide ids.
 mapped.cols <- mapTableColumn('Ensembl','Human','Ensembl','HGNC') ##works directly on the node table in Cytoscape
@@ -108,7 +105,7 @@ node.table.prot <- merge(mapped.cols, node.table.prot, by="Ensembl", all=FALSE)
 ## These are the nodes we are going to add phospho nodes to.
 ## Using PROGENy data, positive regulation
 matching.nodes.prot <- node.table.prot %>% 
-  filter(HGNC %in% cptac.egfr.ccrcc.pos$symbol) %>% 
+  filter(HGNC %in% cptac.progeny.egfr.ccrcc.pos$symbol) %>% 
   select(SUID, name) 
 
 ##Get position for all relevant protein nodes, store as data frame
@@ -129,11 +126,7 @@ rownames(node.height) <- 1:nrow(node.height)
 node.layout <- merge(node.width, node.height, by="suid")
 node.layout <- merge(node.layout, node.positions, by="suid")
 
-# ##To-Do: add the different phospho node options to node.layout
-# pos.x <- p.position$x_location 
-# pos.y <- p.position$y_location
-
-#Calculate and add x and y pos for traditional ptm viz. Use 4 sites on each node.
+## Calculate and add x and y pos for traditional ptm viz. Use 4 sites on each node.
 node.layout <- node.layout %>%
   mutate(x.ptm = pmap(list(x_location, node.width), 
                             function(x_val, width_val) {
@@ -142,6 +135,8 @@ node.layout <- node.layout %>%
   mutate(y.ptm = pmap(list(y_location, node.height), 
                       function(y_val, height_val) {
                         list(y_val + (height_val / 2),y_val - (height_val / 2),y_val - (height_val / 2),y_val + (height_val / 2))}))
+
+## To-Do: add the different phospho node options to node.layout
 
 ## Need this for matching with kinase substrate data
 # matching.nodes.phospho <- cptac.phospho.ccrcc.sig %>%
@@ -214,8 +209,16 @@ for (p in matching.nodes.prot$SUID){
 ##############
 ## Data viz
 style.name = "WikiPathways"
+
+## Update defaults
 setNodeColorDefault('#FFFFFF', style.name = style.name)
 setNodeBorderColorDefault("#737373", style.name = style.name)
+
+## Update style for ptm nodes
+setNodeFontSizeBypass(ptms.all$SUID, 9)
+setNodeWidthBypass(ptms.all$SUID, 35) 
+setNodeHeightBypass(ptms.all$SUID, 20)
+#to-do: bring phospho nodes to the front. not sure if this is possible with RCy3
 
 ## Load protein data and visualize as node color.
 ## Alt 1: Visualize CPTAC protein and CPTAC phospho data on node fill for protein and ptm nodes.
@@ -230,21 +233,13 @@ RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name
 
 loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
 loadTableData(cptac.egfr.ccrcc.pos, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
-RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) ##we will overwrite ptm node color later
 
 ptms.all.data <- inner_join(ptms.all, cptac.egfr.ccrcc.pos, by = join_by(name == symbol_site)) %>%
   mutate(color = case_when(CCRCC.val > 0.5 ~ "#f06262", CCRCC.val < 0.5 ~ "#f0a3a3", CCRCC.val == 0.5 ~ "#f0a3a3"))
 setNodeColorBypass(node.names = ptms.all.data$SUID, new.colors = ptms.all.data$color)
 
+##Create new df to map to network to update ptm node label
 ptms.all.data.site <- ptms.all.data %>%
   select(SUID, site) %>%
   rename(name = site)
-
 loadTableData(ptms.all.data.site,data.key.column="SUID", "node", table.key.column = "SUID")
-
-## Update style for ptm nodes.
-setNodeFontSizeBypass(ptms.all$SUID, 9)
-setNodeWidthBypass(ptms.all$SUID, 35) 
-setNodeHeightBypass(ptms.all$SUID, 20)
-#to-do: bring phospho nodes to the front. not sure if this is possible with RCy3
-
