@@ -94,15 +94,13 @@ mapped.cols <- mapped.cols %>%
 
 node.table.prot <- merge(mapped.cols, node.table.prot, by="Ensembl", all=FALSE)
 
-## All matching nodes: Intersection between pathway protein/gene nodes and significant phospho data
-## These are the nodes we are going to add phospho nodes to.
+## Add all matching phospho nodes: Intersection between pathway protein/gene nodes and significant phospho data
 ## Using CPTAC data
 # matching.nodes.prot <- node.table.prot %>% 
 #   filter(HGNC %in% cptac.phospho.ccrcc.sig$symbol) %>% 
 #   select(SUID, name) 
 
-## All matching nodes: Intersection between pathway protein/gene nodes and significant phospho data
-## These are the nodes we are going to add phospho nodes to.
+## Add all matching phospho nodes: Intersection between pathway protein/gene nodes and significant phospho data
 ## Using PROGENy data, positive regulation
 matching.nodes.prot <- node.table.prot %>% 
   filter(HGNC %in% cptac.progeny.egfr.ccrcc.pos$symbol) %>% 
@@ -227,16 +225,16 @@ setNodeHeightBypass(ptms.all$SUID, 20)
 loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
 loadTableData(cptac.phospho.ccrcc, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
 RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
+ptms.all.data <- inner_join(ptms.all, cptac.phospho.ccrcc, by = join_by(name == symbol_site)) ##add back site info etc
 
-## Alt 2: Visualize CPTAC protein on protein node, and PROGENy data on ptm nodes.
-## Since the data is different (Wilcoxon vs Spearman correlation), the ptm node color will be done via bypass.
+# ## Alt 2: Visualize CPTAC protein on protein node, and PROGENy data on ptm nodes.
+# ## Since the data is different (Wilcoxon vs Spearman correlation), the ptm node color will be done via bypass.
+# loadTableData(cptac.egfr.ccrcc.pos, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
+# 
+# ptms.all.data <- inner_join(ptms.all, cptac.egfr.ccrcc.pos, by = join_by(name == symbol_site)) %>%
+#   mutate(color = case_when(CCRCC.val > 0.5 ~ "#f06262", CCRCC.val < 0.5 ~ "#f0a3a3", CCRCC.val == 0.5 ~ "#f0a3a3"))
+# setNodeColorBypass(node.names = ptms.all.data$SUID, new.colors = ptms.all.data$color)
 
-loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
-loadTableData(cptac.egfr.ccrcc.pos, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
-
-ptms.all.data <- inner_join(ptms.all, cptac.egfr.ccrcc.pos, by = join_by(name == symbol_site)) %>%
-  mutate(color = case_when(CCRCC.val > 0.5 ~ "#f06262", CCRCC.val < 0.5 ~ "#f0a3a3", CCRCC.val == 0.5 ~ "#f0a3a3"))
-setNodeColorBypass(node.names = ptms.all.data$SUID, new.colors = ptms.all.data$color)
 
 ##Create new df to map to network to update ptm node label
 ptms.all.data.site <- ptms.all.data %>%
