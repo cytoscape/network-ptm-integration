@@ -70,6 +70,14 @@ psp.data.human<- psp.data %>%
   mutate(symbol_site=paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>%
   select(GENE, symbol_site, SUBSTRATE, SUB_MOD_RSD) #human only, in vivo evidence only
 
+## Import BioMART mapping data and rename columns. To enable data mapping between node table and CPTAC data using EnsemblProt id.
+biomart <- read.csv("../annotations/mart_export.txt", stringsAsFactors = F, sep = ",")
+
+biomart <- biomart %>%
+  rename(Ensembl = Gene.stable.ID, EnsemblProt = Protein.stable.ID) %>%
+  select(Ensembl, EnsemblProt)
+
+
 ###############
 ## Open and process WP, get relevant phospho data nodes and cross-check against kinase-substrate data
 RCy3::commandsRun('wikipathways import-as-pathway id=WP4806') 
@@ -86,13 +94,9 @@ node.table <- RCy3::getTableColumns(table = "node")
 node.table.prot <- subset(node.table, Type == 'Protein' | Type == 'GeneProduct') %>%
   select(SUID, name, XrefId, Ensembl)
 
-## Map from Ensembl to HGNC, use HGNC to match with data (gene symbol). Note: the mapping should really be to Ensembl peptide ids.
-mapped.cols <- mapTableColumn('Ensembl','Human','Ensembl','HGNC') ##works directly on the node table in Cytoscape
-mapped.cols <- mapped.cols %>% 
-  filter(!is.na(Ensembl) & !is.na(HGNC)) %>% 
-  distinct()
-
-node.table.prot <- merge(mapped.cols, node.table.prot, by="Ensembl", all=FALSE)
+## Add Ensembl prot column to use for all data mapping
+node.table.prot.mapped <- merge(node.table.prot, biomart, by="Ensembl") %>%
+  filter(!is.na(EnsemblProt)) ##this contains rows where EnsemblProt is empty
 
 ## Add all matching phospho nodes: Intersection between pathway protein/gene nodes and significant phospho data
 ## Using CPTAC data
@@ -102,8 +106,8 @@ node.table.prot <- merge(mapped.cols, node.table.prot, by="Ensembl", all=FALSE)
 
 ## Add all matching phospho nodes: Intersection between pathway protein/gene nodes and significant phospho data
 ## Using PROGENy data, positive regulation
-matching.nodes.prot <- node.table.prot %>% 
-  filter(HGNC %in% cptac.progeny.egfr.ccrcc.pos$symbol) %>% 
+matching.nodes.prot <- node.table.prot.mapped %>% 
+  filter(EnsemblProt %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
   select(SUID, name) 
 
 ##Get position for all relevant protein nodes, store as data frame
@@ -142,7 +146,7 @@ node.layout <- node.layout %>%
 #   mutate(symbol_site=paste0(symbol, "_", site)) %>%
 #   select(symbol, site, symbol_site)
 
-matching.nodes.phospho <- cptac.egfr.ccrcc.pos %>%
+matching.nodes.phospho <- cptac.progeny.egfr.ccrcc.pos %>%
   filter(symbol %in% node.table.prot$name) %>%
   mutate(symbol_site=paste0(symbol, "_", site)) %>%
   select(symbol, site, symbol_site)
