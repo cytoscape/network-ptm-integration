@@ -227,7 +227,7 @@ setNodeHeightBypass(ptms.all$SUID, 20)
 ## For this we can use the same visualization since the value is the same, Wilcoxon rank sum test
 
 loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
-loadTableData(cptac.phospho.ccrcc, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
+loadTableData(cptac.phospho.ccrcc.sig, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
 RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
 ptms.all.data <- inner_join(ptms.all, cptac.phospho.ccrcc, by = join_by(name == symbol_site)) ##add back site info etc
 
