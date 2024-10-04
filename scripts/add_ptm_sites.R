@@ -7,6 +7,8 @@ BiocManager::install("RCy3")
 #BiocManager::install("BridgeDbR")
 #install.packages("biomaRt")
 install.packages("dplyr")
+install.packages("tidyverse")
+install.packages("ggplot2")
 
 library(rWikiPathways)
 library(RCy3)
@@ -14,6 +16,7 @@ library(dplyr)
 library(stringr)
 library(RColorBrewer)
 library(purrr)
+library(ggplot2)
 #library('biomaRt')
 cytoscapePing()
 
@@ -35,6 +38,14 @@ cptac.phospho <- cptac.phospho %>%
 cptac.phospho.ccrcc.sig <- cptac.phospho %>% 
   filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) %>%
   select(symbol, site, protein, symbol_site, CCRCC.val, CCRCC.pval)
+
+##Testing using omicsvisualizer
+cptac.phospho.ccrcc.ov <- cptac.phospho.ccrcc.sig %>%
+  filter(symbol_site %in% cptac.progeny.egfr.ccrcc.pos$symbol_site) %>%
+  mutate(symbol_ptm=paste0(symbol, "_ptm"))
+
+# for testing purposes
+#write.table(cptac.phospho.ccrcc.ov,"cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
 
 ## PROGENy EGFR pathway correlated phospho data. 
 ## Sites are either positively correlated with the EGFR pathway (contributing to pathway activity), or negatively correlated (inhibitory) 
@@ -77,7 +88,6 @@ biomart <- biomart %>%
   rename(Ensembl = Gene.stable.ID, EnsemblProt = Protein.stable.ID) %>%
   select(Ensembl, EnsemblProt)
 
-
 ###############
 ## Open and process WP, get relevant phospho data nodes and cross-check against kinase-substrate data
 RCy3::commandsRun('wikipathways import-as-pathway id=WP4806') 
@@ -104,13 +114,13 @@ node.table.prot.mapped <- merge(node.table.prot, biomart, by="Ensembl") %>%
 #   filter(HGNC %in% cptac.phospho.ccrcc.sig$symbol) %>% 
 #   select(SUID, name) 
 
-## Add all matching phospho nodes: Intersection between pathway protein/gene nodes and significant phospho data
+## Find pathway protein nodes to add phospho nodes to. Intersection between pathway protein/gene nodes and positively regulated PROGENy sites.
 ## Using PROGENy data, positive regulation
 matching.nodes.prot <- node.table.prot.mapped %>% 
   filter(EnsemblProt %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
   select(SUID, name) 
 
-##Get position for all relevant protein nodes, store as data frame
+##Get position for all relevant pathway protein nodes, store as data frame
 node.positions <- getNodePosition(node.names=matching.nodes.prot$SUID)
 node.positions <- cbind(suid = rownames(node.positions), node.positions)
 rownames(node.positions) <- 1:nrow(node.positions)
@@ -127,8 +137,10 @@ rownames(node.height) <- 1:nrow(node.height)
 
 node.layout <- merge(node.width, node.height, by="suid")
 node.layout <- merge(node.layout, node.positions, by="suid")
+node.layout.pie <- node.layout #copy
 
-## Calculate and add x and y pos for traditional ptm viz. Use 4 sites on each node.
+## Traditional ptm viz using 4 sites per node.
+## Calculate and add x and y pos.
 node.layout <- node.layout %>%
   mutate(x.ptm = pmap(list(x_location, node.width), 
                             function(x_val, width_val) {
@@ -138,7 +150,11 @@ node.layout <- node.layout %>%
                       function(y_val, height_val) {
                         list(y_val + (height_val / 2),y_val - (height_val / 2),y_val - (height_val / 2),y_val + (height_val / 2))}))
 
-## To-Do: add the different phospho node options to node.layout
+## Alternative viz with one ptm node with pie chart
+## Calculate and add x and y pos.
+node.layout.pie <- node.layout.pie %>%
+  mutate(x.ptm = (x_location + node.width / 2 + 20)) %>%
+  mutate(y.ptm = y_location )
 
 ## Need this for matching with kinase substrate data
 # matching.nodes.phospho <- cptac.phospho.ccrcc.sig %>%
@@ -146,6 +162,7 @@ node.layout <- node.layout %>%
 #   mutate(symbol_site=paste0(symbol, "_", site)) %>%
 #   select(symbol, site, symbol_site)
 
+## Use PROGENy data to select ptms to add
 matching.nodes.phospho <- cptac.progeny.egfr.ccrcc.pos %>%
   filter(symbol %in% node.table.prot$name) %>%
   mutate(symbol_site=paste0(symbol, "_", site)) %>%
@@ -165,13 +182,14 @@ matching.nodes.phospho.kin.sites <- matching.nodes.phospho.kin %>%
   select(symbol, symbol_site) 
 
 #mode <- "kinase"
+
 ###############
+
+## Traditional viz with max 4 ptms per protein node
 ## Adding phospho nodes to pathway
 ## Add phospho nodes by looping through relevant protein nodes
 
-##Using CPTAC phospho data
-site.table <- matching.nodes.phospho
-
+site.table <- matching.nodes.phospho 
 
 ## If mode is "kinase only", update inputs
 if (mode == "kinase"){
@@ -208,6 +226,44 @@ for (p in matching.nodes.prot$SUID){
   ptms.all <- rbind(ptms.all, ptms)
 }
 
+###############
+
+## Alt viz mockup: pie charts using OmicsVisualizer
+
+#make new data frame with correct name
+matching.nodes.prot.pie <- node.table.prot.mapped %>% 
+  filter(EnsemblProt %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
+  mutate(name=paste0(name,"_ptm")) %>% 
+  select(SUID, name) 
+
+#Add new ptm node for all relevant proteins
+for (p in matching.nodes.prot.pie$SUID){
+  #add node
+  ptm.name <- matching.nodes.prot.pie$name[matching.nodes.prot.pie$SUID == p]
+  print(ptm.name)
+  suid.list <- addCyNodes(node.names = ptm.name, skip.duplicate.names = FALSE)
+  suid.ptm <- suid.list[[1]]$SUID
+  print(suid.ptm)
+  
+  #move node
+  x <- node.layout.pie$x.ptm[node.layout.pie$suid == p]
+  y <- node.layout.pie$y.ptm[node.layout.pie$suid == p]
+  
+  print(x)
+  print(y)
+  setNodePositionBypass(node.names = suid.ptm, x, y)
+}
+
+#OmicsVisualizer
+#Import table from data frame (cptac.phospho.ccrcc.ov). Not sure this is possible via ov commands.....
+#Current solution for tesing: export table to csv (line 48) and import using UI
+
+#Link table
+#commandsRun('ov connect symbol_ptm symbol_site')
+
+#Add chart visualization
+#commandsRun(paste0('ov ov viz apply inner continuous idAttribute="Ensembl" linkSetFiles="', drugbank, '"') )
+
 ##############
 ## Data viz
 style.name = "WikiPathways"
@@ -229,7 +285,7 @@ setNodeHeightBypass(ptms.all$SUID, 20)
 loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
 loadTableData(cptac.phospho.ccrcc.sig, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
 RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
-ptms.all.data <- inner_join(ptms.all, cptac.phospho.ccrcc, by = join_by(name == symbol_site)) ##add back site info etc
+ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == symbol_site)) ##add back site info etc
 
 # ## Alt 2: Visualize CPTAC protein on protein node, and PROGENy data on ptm nodes.
 # ## Since the data is different (Wilcoxon vs Spearman correlation), the ptm node color will be done via bypass.
