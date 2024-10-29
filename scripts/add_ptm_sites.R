@@ -5,10 +5,8 @@ if (!requireNamespace("BiocManager", quietly = TRUE)){
 BiocManager::install("rWikiPathways")
 BiocManager::install("RCy3")
 #BiocManager::install("BridgeDbR")
-#install.packages("biomaRt")
 install.packages("dplyr")
 install.packages("tidyverse")
-install.packages("ggplot2")
 
 library(rWikiPathways)
 library(RCy3)
@@ -16,8 +14,6 @@ library(dplyr)
 library(stringr)
 library(RColorBrewer)
 library(purrr)
-library(ggplot2)
-#library('biomaRt')
 cytoscapePing()
 
 ##Change working dir for local dev. Adjust path based on setup.
@@ -39,21 +35,13 @@ cptac.phospho.ccrcc.sig <- cptac.phospho %>%
   filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) %>%
   select(symbol, site, protein, symbol_site, CCRCC.val, CCRCC.pval)
 
-##Testing using omicsvisualizer
-cptac.phospho.ccrcc.ov <- cptac.phospho.ccrcc.sig %>%
-  filter(symbol_site %in% cptac.progeny.egfr.ccrcc.pos$symbol_site) %>%
-  mutate(symbol_ptm=paste0(symbol, "_ptm"))
-
-# for testing purposes
-#write.table(cptac.phospho.ccrcc.ov,"cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
-
 ## PROGENy EGFR pathway correlated phospho data. 
 ## Sites are either positively correlated with the EGFR pathway (contributing to pathway activity), or negatively correlated (inhibitory) 
 ## cohort.val: Spearman correlation coefficient;  cohort.pval: p-value
 cptac.progeny.egfr <- read.csv("../datasets/CPTAC_PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
 
 ## Positively regulated PROGENy EGFR pathway and CCRCC
-## To-Do: Not sure how to filter this data using val and pval
+## To-Do: Not sure how to best filter this data using val and pval
 cptac.progeny.egfr.ccrcc.pos <- cptac.progeny.egfr %>%
   filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) %>%
   mutate(symbol_site=paste0(symbol, "_", site)) %>% 
@@ -64,6 +52,14 @@ cptac.progeny.egfr.ccrcc.neg <- cptac.progeny.egfr %>%
   filter(CCRCC.pval > -0.05 & CCRCC.pval < 0) %>%
   mutate(symbol_site=paste0(symbol, "_", site)) %>%
   select(symbol, protein, site, symbol_site, CCRCC.val, CCRCC.pval)
+
+##Testing using omicsvisualizer
+cptac.phospho.ccrcc.ov <- cptac.phospho.ccrcc.sig %>%
+  filter(symbol_site %in% cptac.progeny.egfr.ccrcc.pos$symbol_site) %>%
+  mutate(symbol_ptm=paste0(symbol, "_ptm"))
+
+# for testing purposes
+write.table(cptac.phospho.ccrcc.ov,"cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
 
 ## Protein data from CPTAC. Note that this includes NA values.
 ## The "pval" and "val" statistics are from Wilcoxon rank sum test. Positive values means abundance is higher in tumor.
@@ -107,12 +103,6 @@ node.table.prot <- subset(node.table, Type == 'Protein' | Type == 'GeneProduct')
 ## Add Ensembl prot column to use for all data mapping
 node.table.prot.mapped <- merge(node.table.prot, biomart, by="Ensembl") %>%
   filter(!is.na(EnsemblProt)) ##this contains rows where EnsemblProt is empty
-
-## Add all matching phospho nodes: Intersection between pathway protein/gene nodes and significant phospho data
-## Using CPTAC data
-# matching.nodes.prot <- node.table.prot %>% 
-#   filter(HGNC %in% cptac.phospho.ccrcc.sig$symbol) %>% 
-#   select(SUID, name) 
 
 ## Find pathway protein nodes to add phospho nodes to. Intersection between pathway protein/gene nodes and positively regulated PROGENy sites.
 ## Using PROGENy data, positive regulation
@@ -240,29 +230,38 @@ matching.nodes.prot.pie <- node.table.prot.mapped %>%
 for (p in matching.nodes.prot.pie$SUID){
   #add node
   ptm.name <- matching.nodes.prot.pie$name[matching.nodes.prot.pie$SUID == p]
-  print(ptm.name)
   suid.list <- addCyNodes(node.names = ptm.name, skip.duplicate.names = FALSE)
   suid.ptm <- suid.list[[1]]$SUID
-  print(suid.ptm)
-  
+
   #move node
   x <- node.layout.pie$x.ptm[node.layout.pie$suid == p]
   y <- node.layout.pie$y.ptm[node.layout.pie$suid == p]
   
-  print(x)
-  print(y)
   setNodePositionBypass(node.names = suid.ptm, x, y)
+  setNodeWidthBypass(node.names = suid.ptm, 40) 
+  setNodeHeightBypass(node.names = suid.ptm, 40)
 }
 
 #OmicsVisualizer
-#Import table from data frame (cptac.phospho.ccrcc.ov). Not sure this is possible via ov commands.....
-#Current solution for tesing: export table to csv (line 48) and import using UI
+##This command doesn't work, there's a problem locating the file. 
+##Need to do this step manually in the UI for now
+ovload.cmd<-paste('ov load',
+                  'dataTypeList="string,string,string,string,double,double,string"', 
+                  'file="cptac.phospho.ccrcc.sig.txt"', 
+                  'newTableName="cptac.phospho.ccrcc"', 
+                  'startLoadRow="2"')
+commandsRun(ovload.cmd)
 
 #Link table
-#commandsRun('ov connect symbol_ptm symbol_site')
+ovconnect.cmd<-paste('ov connect',
+                  'mappingColNet="shared name"', 
+                  'mappingColTable="symbol_ptm"')
+commandsRun(ovconnect.cmd)
 
 #Add chart visualization
-#commandsRun(paste0('ov ov viz apply inner continuous idAttribute="Ensembl" linkSetFiles="', drugbank, '"') )
+ovviz.cmd<-paste('ov viz apply inner continuous',
+                     'attributes="CCRCC.val"')
+commandsRun(ovviz.cmd)
 
 ##############
 ## Data viz
@@ -283,7 +282,8 @@ setNodeHeightBypass(ptms.all$SUID, 20)
 ## For this we can use the same visualization since the value is the same, Wilcoxon rank sum test
 
 loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
-loadTableData(cptac.phospho.ccrcc.sig, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
+##Skip the next line if using omicsvisualizer
+#loadTableData(cptac.phospho.ccrcc.sig, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
 RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
 ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == symbol_site)) ##add back site info etc
 
