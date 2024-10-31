@@ -3,16 +3,16 @@ if (!requireNamespace("BiocManager", quietly = TRUE)){
   install.packages("BiocManager")}
 
 BiocManager::install("rWikiPathways")
-BiocManager::install("RCy3")
+aBiocManager::install("RCy3")
 #BiocManager::install("BridgeDbR")
 install.packages("dplyr")
-install.packages("tidyverse")
+#install.packages("tidyverse")
 
 library(rWikiPathways)
 library(RCy3)
 library(dplyr)
-library(stringr)
-library(RColorBrewer)
+#library(stringr)
+#library(RColorBrewer)
 library(purrr)
 cytoscapePing()
 
@@ -52,14 +52,6 @@ cptac.progeny.egfr.ccrcc.neg <- cptac.progeny.egfr %>%
   filter(CCRCC.pval > -0.05 & CCRCC.pval < 0) %>%
   mutate(symbol_site=paste0(symbol, "_", site)) %>%
   select(symbol, protein, site, symbol_site, CCRCC.val, CCRCC.pval)
-
-##Testing using omicsvisualizer
-cptac.phospho.ccrcc.ov <- cptac.phospho.ccrcc.sig %>%
-  filter(symbol_site %in% cptac.progeny.egfr.ccrcc.pos$symbol_site) %>%
-  mutate(symbol_ptm=paste0(symbol, "_ptm"))
-
-# for testing purposes
-write.table(cptac.phospho.ccrcc.ov,"cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
 
 ## Protein data from CPTAC. Note that this includes NA values.
 ## The "pval" and "val" statistics are from Wilcoxon rank sum test. Positive values means abundance is higher in tumor.
@@ -216,9 +208,49 @@ for (p in matching.nodes.prot$SUID){
   ptms.all <- rbind(ptms.all, ptms)
 }
 
+## Data viz 
+style.name = "WikiPathways"
+
+## Update defaults
+setNodeColorDefault('#FFFFFF', style.name = style.name)
+setNodeBorderColorDefault("#737373", style.name = style.name)
+
+## Update style for ptm nodes
+setNodeFontSizeBypass(ptms.all$SUID, 9)
+setNodeWidthBypass(ptms.all$SUID, 35) 
+setNodeHeightBypass(ptms.all$SUID, 20)
+#to-do: bring phospho nodes to the front. not sure if this is possible with RCy3
+
+## Load protein data and visualize as node color.
+## Alt 1: Visualize CPTAC protein and CPTAC phospho data on node fill for protein and ptm nodes.
+## For this we can use the same visualization since the value is the same, Wilcoxon rank sum test
+
+loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
+loadTableData(cptac.phospho.ccrcc.sig, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
+RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
+ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == symbol_site)) ##add back site info etc
+
+##Create new df to map to network to update ptm node label
+ptms.all.data.site <- ptms.all.data %>%
+  select(SUID, site) %>%
+  rename(name = site)
+loadTableData(ptms.all.data.site,data.key.column="SUID", "node", table.key.column = "SUID")
+setNodeLabelMapping('name', style.name = style.name)
+
 ###############
 
-## Alt viz mockup: pie charts using OmicsVisualizer
+## Alt viz: pie charts using OmicsVisualizer
+## Rerun lines 80-151 to read in the pathway and setup
+
+##To-Do: Redo mapping of column to use prot_ptm instead of symbol_ptm
+
+##Subset of phospho data that matches progeny data
+cptac.phospho.ccrcc.ov <- cptac.phospho.ccrcc.sig %>%
+  filter(symbol_site %in% cptac.progeny.egfr.ccrcc.pos$symbol_site) %>%
+  mutate(symbol_ptm=paste0(symbol, "_ptm"))
+
+# write to file since no option to import data frame directly
+write.table(cptac.phospho.ccrcc.ov,"cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
 
 #make new data frame with correct name
 matching.nodes.prot.pie <- node.table.prot.mapped %>% 
@@ -260,10 +292,9 @@ commandsRun(ovconnect.cmd)
 
 #Add chart visualization
 ovviz.cmd<-paste('ov viz apply inner continuous',
-                     'attributes="CCRCC.val"')
+                     'attributes="CCRCC.val"', 'paletteName="HSV Red-Blue"', 'labels="site"')
 commandsRun(ovviz.cmd)
 
-##############
 ## Data viz
 style.name = "WikiPathways"
 
@@ -273,8 +304,6 @@ setNodeBorderColorDefault("#737373", style.name = style.name)
 
 ## Update style for ptm nodes
 setNodeFontSizeBypass(ptms.all$SUID, 9)
-setNodeWidthBypass(ptms.all$SUID, 35) 
-setNodeHeightBypass(ptms.all$SUID, 20)
 #to-do: bring phospho nodes to the front. not sure if this is possible with RCy3
 
 ## Load protein data and visualize as node color.
@@ -282,22 +311,5 @@ setNodeHeightBypass(ptms.all$SUID, 20)
 ## For this we can use the same visualization since the value is the same, Wilcoxon rank sum test
 
 loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
-##Skip the next line if using omicsvisualizer
-#loadTableData(cptac.phospho.ccrcc.sig, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
 RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
 ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == symbol_site)) ##add back site info etc
-
-# ## Alt 2: Visualize CPTAC protein on protein node, and PROGENy data on ptm nodes.
-# ## Since the data is different (Wilcoxon vs Spearman correlation), the ptm node color will be done via bypass.
-# loadTableData(cptac.egfr.ccrcc.pos, data.key.column="symbol_site", "node", table.key.column = 'shared name') ##load phospho data
-# 
-# ptms.all.data <- inner_join(ptms.all, cptac.egfr.ccrcc.pos, by = join_by(name == symbol_site)) %>%
-#   mutate(color = case_when(CCRCC.val > 0.5 ~ "#f06262", CCRCC.val < 0.5 ~ "#f0a3a3", CCRCC.val == 0.5 ~ "#f0a3a3"))
-# setNodeColorBypass(node.names = ptms.all.data$SUID, new.colors = ptms.all.data$color)
-
-
-##Create new df to map to network to update ptm node label
-ptms.all.data.site <- ptms.all.data %>%
-  select(SUID, site) %>%
-  rename(name = site)
-loadTableData(ptms.all.data.site,data.key.column="SUID", "node", table.key.column = "SUID")
