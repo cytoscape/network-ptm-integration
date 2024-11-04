@@ -250,7 +250,7 @@ cptac.phospho.ccrcc.ov <- cptac.phospho.ccrcc.sig %>%
   mutate(symbol_ptm=paste0(symbol, "_ptm"))
 
 # write to file since no option to import data frame directly
-write.table(cptac.phospho.ccrcc.ov,"cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
+write.table(cptac.phospho.ccrcc.ov,"/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
 
 #make new data frame with correct name
 matching.nodes.prot.pie <- node.table.prot.mapped %>% 
@@ -275,11 +275,9 @@ for (p in matching.nodes.prot.pie$SUID){
 }
 
 #OmicsVisualizer
-##This command doesn't work, there's a problem locating the file. 
-##Need to do this step manually in the UI for now
 ovload.cmd<-paste('ov load',
                   'dataTypeList="string,string,string,string,double,double,string"', 
-                  'file="cptac.phospho.ccrcc.sig.txt"', 
+                  'file="/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.sig.txt"', 
                   'newTableName="cptac.phospho.ccrcc"', 
                   'startLoadRow="2"')
 commandsRun(ovload.cmd)
