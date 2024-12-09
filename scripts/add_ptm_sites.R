@@ -35,10 +35,11 @@ cptac.phospho.ccrcc.sig <- cptac.phospho %>%
   filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) %>%
   select(symbol, site, protein, symbol_site, CCRCC.val, CCRCC.pval)
 
-## PROGENy EGFR pathway correlated phospho data. 
-## Sites are either positively correlated with the EGFR pathway (contributing to pathway activity), or negatively correlated (inhibitory) 
+## PROGENy pathway correlated phospho data. PROGENy data for multiple pathways are available in datasets/PROGENy.
+## Sites are either positively correlated with the pathway (contributing to pathway activity), or negatively correlated (inhibitory) 
 ## cohort.val: Spearman correlation coefficient;  cohort.pval: p-value
-cptac.progeny.egfr <- read.csv("../datasets/CPTAC_PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
+## The following example is for the EGFR pathway.
+cptac.progeny.egfr <- read.csv("../datasets/PROGENy/PROGENy__EGFR.txt", stringsAsFactors = F, sep = "\t")
 
 ## Positively regulated PROGENy EGFR pathway and CCRCC
 ## To-Do: Not sure how to best filter this data using val and pval
@@ -78,6 +79,8 @@ biomart <- biomart %>%
 
 ###############
 ## Open and process WP, get relevant phospho data nodes and cross-check against kinase-substrate data
+## Open the WP that corresponds with the PROGENy data used. The below example uses the EGFR pathway.
+## WPIDs for other pathways: Estrogen signaling WP712, MAPK signaling WP382, TP53 network WP1742, PI3K-Akt signaling WP4172, Wnt signaling WP428
 RCy3::commandsRun('wikipathways import-as-pathway id=WP4806') 
 
 ## Remove existing ptm states from nodes. These are encoded as nodes with the label P.
@@ -250,7 +253,7 @@ cptac.phospho.ccrcc.ov <- cptac.phospho.ccrcc.sig %>%
   mutate(symbol_ptm=paste0(symbol, "_ptm"))
 
 # write to file since no option to import data frame directly
-write.table(cptac.phospho.ccrcc.ov,"/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
+#write.table(cptac.phospho.ccrcc.ov,"/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
 
 #make new data frame with correct name
 matching.nodes.prot.pie <- node.table.prot.mapped %>% 
