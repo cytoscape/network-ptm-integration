@@ -24,7 +24,7 @@ setwd("~/github/network-ptm-integration/scripts")
 
 ## Phosphoprotein data from CPTAC. Note that this includes NA values. 
 ## The "pval" and "val" statistics are from Wilcoxon rank sum test. Positive values means abundance is higher in tumor.
-## Add unique id symbol_site for each protein/site combination
+## Add unique id prot_site for each protein/site combination
 cptac.phospho <- read.csv("../datasets/CPTAC_phospho_tn.txt", stringsAsFactors = F, sep = "\t")
 cptac.phospho <- cptac.phospho %>% 
   mutate(prot_site=paste0(protein, "_", site))
@@ -33,6 +33,10 @@ cptac.phospho <- cptac.phospho %>%
 ## Select significant rows based on significant p-value in CCRCC vs control
 cptac.phospho.ccrcc.sig <- cptac.phospho %>% 
   filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) %>%
+  select(symbol, site, protein, prot_site, CCRCC.val, CCRCC.pval)
+
+##Full CCRCC dataset
+cptac.phospho.ccrcc <- cptac.phospho %>% 
   select(symbol, site, protein, prot_site, CCRCC.val, CCRCC.pval)
 
 ## PROGENy pathway correlated phospho data. PROGENy data for multiple pathways are available in datasets/PROGENy.
@@ -64,11 +68,12 @@ cptac.protein.ccrcc <- cptac.protein %>%
   filter(!is.na(CCRCC.pval) & !is.na(CCRCC.pval))
 
 ## Phosphosite kinase-substrate data
+##To-Do: Update for protein instead of symbol. This requires mapping from UniProt id to Ensprot after this step to work with the rest of the script.
 psp.data <- read.csv("../annotations/Kinase_Substrate_Dataset.txt", stringsAsFactors = F, sep = "\t")
-psp.data.human<- psp.data %>%
-  filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X")  %>% 
-  mutate(symbol_site=paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>% ##Update for protein instead of symbol. This requires mapping from UniProt id to Ensprot after this step to work with the rest of the script.
-  select(GENE, symbol_site, SUBSTRATE, SUB_MOD_RSD) #human only, in vivo evidence only. 
+# psp.data.human<- psp.data %>%
+#   filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X")  %>% 
+#   mutate(prot_site=paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>% 
+#   select(GENE, prot_site, SUBSTRATE, SUB_MOD_RSD) #human only, in vivo evidence only. 
 
 ## Import BioMART mapping data and rename columns. To enable data mapping between node table and CPTAC data using EnsemblProt id.
 biomart <- read.csv("../annotations/mart_export.txt", stringsAsFactors = F, sep = ",")
@@ -144,8 +149,8 @@ node.layout.pie <- node.layout.pie %>%
 ## Need this for matching with kinase substrate data
 # matching.nodes.phospho <- cptac.phospho.ccrcc.sig %>%
 #   filter(symbol %in% node.table.prot$name) %>%
-#   mutate(symbol_site=paste0(symbol, "_", site)) %>%
-#   select(symbol, site, symbol_site)
+#   mutate(prot_site=paste0(protein, "_", site)) %>%
+#   select(symbol, site, prot_site)
 
 ## Use PROGENy data to select ptms to add
 matching.nodes.phospho <- cptac.progeny.egfr.ccrcc.pos %>%
@@ -161,10 +166,10 @@ kinase.pw <- intersect(psp.data.human$GENE, node.table.prot$name) #Kinases on pa
 ## Overlap between phospho nodes and kinase-substrate data, where the kinase (GENE) is on the pathway
 matching.nodes.phospho.kin <- inner_join(matching.nodes.phospho, psp.data.human) %>%
   filter(GENE %in% kinase.pw) %>%
-  select(symbol, symbol_site, site)
+  select(symbol, prot_site, site)
 
 matching.nodes.phospho.kin.sites <- matching.nodes.phospho.kin %>%
-  select(symbol, symbol_site) 
+  select(symbol, prot_site) 
 
 #mode <- "kinase"
 
@@ -230,7 +235,7 @@ setNodeHeightBypass(ptms.all$SUID, 20)
 ## For this we can use the same visualization since the value is the same, Wilcoxon rank sum test
 
 loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
-loadTableData(cptac.phospho.ccrcc.sig, data.key.column="prot_site", "node", table.key.column = 'shared name') ##load phospho data
+loadTableData(cptac.phospho.ccrcc, data.key.column="prot_site", "node", table.key.column = 'shared name') ##load phospho data
 RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
 ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == prot_site)) ##add back site info etc
 
@@ -246,15 +251,19 @@ setNodeLabelMapping('name', style.name = style.name)
 ## Alt viz: pie charts using OmicsVisualizer
 ## Rerun lines 80-151 to read in the pathway and setup
 
-##To-Do: Redo mapping of column to use prot_ptm instead of symbol_ptm
+# ##Subset of phospho data that matches progeny data
+# cptac.phospho.ccrcc.ov <- cptac.phospho.ccrcc.sig %>%
+#   filter(prot_site %in% cptac.progeny.egfr.ccrcc.pos$prot_site) %>%
+#   mutate(symbol_ptm=paste0(symbol, "_ptm"))
 
-##Subset of phospho data that matches progeny data
-cptac.phospho.ccrcc.ov <- cptac.phospho.ccrcc.sig %>%
-  filter(symbol_site %in% cptac.progeny.egfr.ccrcc.pos$symbol_site) %>%
+##Subset of phospho data that matches progeny data using full phospho dataset
+cptac.phospho.ccrcc.full.ov <- cptac.phospho.ccrcc %>%
+  filter(prot_site %in% cptac.progeny.egfr.ccrcc.pos$prot_site) %>%
   mutate(symbol_ptm=paste0(symbol, "_ptm"))
 
 # write to file since no option to import data frame directly
-write.table(cptac.phospho.ccrcc.ov,"/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
+#write.table(cptac.phospho.ccrcc.ov,"/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
+write.table(cptac.phospho.ccrcc.full.ov,"/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.full.txt",sep="\t",row.names=FALSE)
 
 #make new data frame with correct name
 matching.nodes.prot.pie <- node.table.prot.mapped %>% 
@@ -281,8 +290,8 @@ for (p in matching.nodes.prot.pie$SUID){
 #OmicsVisualizer
 ovload.cmd<-paste('ov load',
                   'dataTypeList="string,string,string,string,double,double,string"', 
-                  'file="/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.sig.txt"', 
-                  'newTableName="cptac.phospho.ccrcc"', 
+                  'file="/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.full.txt"', 
+                  'newTableName="cptac.phospho.ccrcc.full"', 
                   'startLoadRow="2"')
 commandsRun(ovload.cmd)
 
@@ -294,7 +303,7 @@ commandsRun(ovconnect.cmd)
 
 #Add chart visualization
 ovviz.cmd<-paste('ov viz apply inner continuous',
-                     'attributes="CCRCC.val"', 'paletteName="HSV Red-Blue"', 'labels="site"')
+                     'attributes="CCRCC.val"', 'paletteName="Red-Blue"', 'labels="site"')
 commandsRun(ovviz.cmd)
 
 ## Data viz
@@ -314,4 +323,4 @@ setNodeFontSizeBypass(ptms.all$SUID, 9)
 
 loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
 RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
-ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == symbol_site)) ##add back site info etc
+ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == prot_site)) ##add back site info etc
