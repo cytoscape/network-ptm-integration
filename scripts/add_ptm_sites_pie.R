@@ -17,7 +17,7 @@ library(purrr)
 cytoscapePing()
 
 ##Change working dir for local dev. Adjust path based on setup.
-setwd("~/github/network-ptm-integration/scripts")
+setwd("~/git/network-ptm-integration/scripts")
 
 ###############
 ## Read in data files
@@ -129,17 +129,6 @@ node.layout <- merge(node.width, node.height, by="suid")
 node.layout <- merge(node.layout, node.positions, by="suid")
 node.layout.pie <- node.layout #copy
 
-## Traditional ptm viz using 4 sites per node.
-## Calculate and add x and y pos.
-node.layout <- node.layout %>%
-  mutate(x.ptm = pmap(list(x_location, node.width), 
-                            function(x_val, width_val) {
-                              list(x_val + (width_val / 2) + 16,x_val + (width_val / 2) + 16,x_val - (width_val / 2) - 16,x_val - (width_val / 2) - 16)}))
-node.layout <- node.layout %>%
-  mutate(y.ptm = pmap(list(y_location, node.height), 
-                      function(y_val, height_val) {
-                        list(y_val + (height_val / 2),y_val - (height_val / 2),y_val - (height_val / 2),y_val + (height_val / 2))}))
-
 ## Alternative viz with one ptm node with pie chart
 ## Calculate and add x and y pos.
 node.layout.pie <- node.layout.pie %>%
@@ -161,23 +150,17 @@ matching.nodes.phospho <- cptac.progeny.egfr.ccrcc.pos %>%
 ###############
 ## Kinase-restricted mode: Only those sites with kinases on pathway: Subset of matching nodes with relevant kinases in the pathway
 ## To-Do: redo for SUID
-kinase.pw <- intersect(psp.data.human$GENE, node.table.prot$name) #Kinases on pathway. GENE column contains kinase.
+## kinase.pw <- intersect(psp.data.human$GENE, node.table.prot$name) #Kinases on pathway. GENE column contains kinase.
 
 ## Overlap between phospho nodes and kinase-substrate data, where the kinase (GENE) is on the pathway
-matching.nodes.phospho.kin <- inner_join(matching.nodes.phospho, psp.data.human) %>%
-  filter(GENE %in% kinase.pw) %>%
-  select(symbol, prot_site, site)
+## matching.nodes.phospho.kin <- inner_join(matching.nodes.phospho, psp.data.human) %>%
+##   filter(GENE %in% kinase.pw) %>%
+##   select(symbol, prot_site, site)
 
-matching.nodes.phospho.kin.sites <- matching.nodes.phospho.kin %>%
-  select(symbol, prot_site) 
+## matching.nodes.phospho.kin.sites <- matching.nodes.phospho.kin %>%
+##   select(symbol, prot_site) 
 
 #mode <- "kinase"
-
-###############
-
-## Traditional viz with max 4 ptms per protein node
-## Adding phospho nodes to pathway
-## Add phospho nodes by looping through relevant protein nodes
 
 site.table <- matching.nodes.phospho 
 
@@ -201,53 +184,13 @@ for (p in matching.nodes.prot$SUID){
   suids <- addCyNodes(node.names = phospho.nodes$prot_site, skip.duplicate.names = FALSE)
   print(suids)
   ptms <- data.frame()
-
+  
   for (l in suids){
     ptms <- rbind(ptms, l)
   }
   
-  ##Set node position bypass for ptm nodes.
-  pos <- 1
-  for (ptm in ptms$SUID){
-    x <- node.layout$x.ptm[node.layout$suid == p][[1]][[pos]]
-    y <- node.layout$y.ptm[node.layout$suid == p][[1]][[pos]]
-      setNodePositionBypass(ptm, x, y)
-    pos <- pos+1
-  }
   ptms.all <- rbind(ptms.all, ptms)
 }
-
-## Data viz 
-style.name = "WikiPathways"
-
-## Update defaults
-setNodeColorDefault('#FFFFFF', style.name = style.name)
-setNodeBorderColorDefault("#737373", style.name = style.name)
-
-## Update style for ptm nodes
-setNodeFontSizeBypass(ptms.all$SUID, 9)
-setNodeWidthBypass(ptms.all$SUID, 35) 
-setNodeHeightBypass(ptms.all$SUID, 20)
-#to-do: bring phospho nodes to the front. not sure if this is possible with RCy3
-
-## Load protein data and visualize as node color.
-## Alt 1: Visualize CPTAC protein and CPTAC phospho data on node fill for protein and ptm nodes.
-## For this we can use the same visualization since the value is the same, Wilcoxon rank sum test
-
-loadTableData(cptac.protein.ccrcc, data.key.column="ensembl", "node", table.key.column = 'Ensembl') ##load protein data
-loadTableData(cptac.phospho.ccrcc, data.key.column="prot_site", "node", table.key.column = 'shared name') ##load phospho data
-RCy3::setNodeColorMapping('CCRCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
-ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == prot_site)) ##add back site info etc
-
-##Create new df to map to network to update ptm node label
-ptms.all.data.site <- ptms.all.data %>%
-  select(SUID, site) %>%
-  rename(name = site)
-loadTableData(ptms.all.data.site,data.key.column="SUID", "node", table.key.column = "SUID")
-setNodeLabelMapping('name', style.name = style.name)
-
-###############
-
 ## Alt viz: pie charts using OmicsVisualizer
 ## Rerun lines 80-151 to read in the pathway and setup
 
@@ -262,8 +205,8 @@ cptac.phospho.ccrcc.full.ov <- cptac.phospho.ccrcc %>%
   mutate(symbol_ptm=paste0(symbol, "_ptm"))
 
 # write to file since no option to import data frame directly
-#write.table(cptac.phospho.ccrcc.ov,"/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
-write.table(cptac.phospho.ccrcc.full.ov,"/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.full.txt",sep="\t",row.names=FALSE)
+#write.table(cptac.phospho.ccrcc.ov,"/Applications/Cytoscape_v3.10.3/sampleData/cptac.phospho.ccrcc.sig.txt",sep="\t",row.names=FALSE)
+write.table(cptac.phospho.ccrcc.full.ov,"/Applications/Cytoscape_v3.10.3/sampleData/cptac.phospho.ccrcc.full.txt",sep="\t",row.names=FALSE)
 
 #make new data frame with correct name
 matching.nodes.prot.pie <- node.table.prot.mapped %>% 
@@ -277,7 +220,7 @@ for (p in matching.nodes.prot.pie$SUID){
   ptm.name <- matching.nodes.prot.pie$name[matching.nodes.prot.pie$SUID == p]
   suid.list <- addCyNodes(node.names = ptm.name, skip.duplicate.names = FALSE)
   suid.ptm <- suid.list[[1]]$SUID
-
+  
   #move node
   x <- node.layout.pie$x.ptm[node.layout.pie$suid == p]
   y <- node.layout.pie$y.ptm[node.layout.pie$suid == p]
@@ -290,20 +233,20 @@ for (p in matching.nodes.prot.pie$SUID){
 #OmicsVisualizer
 ovload.cmd<-paste('ov load',
                   'dataTypeList="string,string,string,string,double,double,string"', 
-                  'file="/Applications/Cytoscape_v3.10.2/sampleData/cptac.phospho.ccrcc.full.txt"', 
+                  'file="/Applications/Cytoscape_v3.10.3/sampleData/cptac.phospho.ccrcc.full.txt"', 
                   'newTableName="cptac.phospho.ccrcc.full"', 
                   'startLoadRow="2"')
 commandsRun(ovload.cmd)
 
 #Link table
 ovconnect.cmd<-paste('ov connect',
-                  'mappingColNet="shared name"', 
-                  'mappingColTable="symbol_ptm"')
+                     'mappingColNet="shared name"', 
+                     'mappingColTable="symbol_ptm"')
 commandsRun(ovconnect.cmd)
 
 #Add chart visualization
 ovviz.cmd<-paste('ov viz apply inner continuous',
-                     'attributes="CCRCC.val"', 'paletteName="Red-Blue"', 'labels="site"')
+                 'attributes="CCRCC.val"', 'paletteName="Red-Blue"', 'labels="site"')
 commandsRun(ovviz.cmd)
 
 ## Data viz
