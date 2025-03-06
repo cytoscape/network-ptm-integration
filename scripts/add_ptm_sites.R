@@ -1,3 +1,7 @@
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("RCy3")
 # Load required libraries
 library(shiny)
 library(shinythemes)
