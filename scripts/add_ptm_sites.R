@@ -432,7 +432,7 @@ server <- function(input, output, session) {
       style.name <- "WikiPathways"
       setNodeColorDefault('#FFFFFF', style.name = style.name)
       setNodeBorderColorDefault("#737373", style.name = style.name)
-      setNodeFontSizeBypass(matching.nodes.prot.pie$SUID, 9)
+     ## setNodeLabelBypass(matching.nodes.prot.pie, '') ##doesnt work
       loadTableData(cptac.protein.ccrcc, data.key.column = "ensembl", 
                     table = "node", table.key.column = 'Ensembl')
       RCy3::setNodeColorMapping('CCRCC.val', colors = paletteColorBrewerRdBu, 
