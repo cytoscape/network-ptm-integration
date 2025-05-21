@@ -404,6 +404,7 @@ server <- function(input, output, session) {
         filter(EnsemblProt %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
         mutate(name = paste0(name, "_ptm")) %>% 
         select(SUID, name)
+       ## pie.nodes <- c()
       for (p in matching.nodes.prot.pie$SUID) {
         ptm.name <- matching.nodes.prot.pie$name[matching.nodes.prot.pie$SUID == p]
         suid.list <- addCyNodes(node.names = ptm.name, skip.duplicate.names = FALSE)
@@ -429,10 +430,18 @@ server <- function(input, output, session) {
                          'paletteName="Red-Blue"', 
                          'labels="site"')
       commandsRun(ovviz.cmd)
+      
+      ##Get the new node table to get the pie chart nodes
+      final.node.table <- RCy3::getTableColumns(table = "node")
+      ptm.nodes <- final.node.table[grepl("_", final.node.table$name), ]$SUID
+      
       style.name <- "WikiPathways"
       setNodeColorDefault('#FFFFFF', style.name = style.name)
       setNodeBorderColorDefault("#737373", style.name = style.name)
-     ## setNodeLabelBypass(matching.nodes.prot.pie, '') ##doesnt work
+      ##The next line will remove the main node label on pie chart nodes, leaving the omicsvisualizer label for each site
+      ##setNodeLabelBypass(ptm.nodes, '')
+      setNodeFontSizeBypass(ptm.nodes, '9')
+      
       loadTableData(cptac.protein.ccrcc, data.key.column = "ensembl", 
                     table = "node", table.key.column = 'Ensembl')
       RCy3::setNodeColorMapping('CCRCC.val', colors = paletteColorBrewerRdBu, 
