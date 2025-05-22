@@ -49,19 +49,19 @@ ui <- navbarPage(
            sidebarLayout(
              sidebarPanel(
                h4("Select Data Files"),
-               selectInput("phosphoFile", "Phospho File (datasets):",
+               selectInput("phosphoFile", "Phosphoproteomics Data File (datasets):",
                            choices = datasetsChoices,
                            selected = names(datasetsChoices)[grep("phospho", names(datasetsChoices), ignore.case = TRUE)[1]]),
-               selectInput("proteinFile", "Protein File (datasets):",
+               selectInput("proteinFile", "Proteomics Data File (datasets):",
                            choices = datasetsChoices,
                            selected = names(datasetsChoices)[grep("protein", names(datasetsChoices), ignore.case = TRUE)[1]]),
-               selectInput("progenyFile", "PROGENy File (datasets/PROGENy):",
+               selectInput("progenyFile", "PROGENy Data File (datasets/PROGENy):",
                            choices = progenyChoices,
                            selected = names(progenyChoices)[1]),
                selectInput("kinaseFile", "Kinase-Substrate File (annotations):",
                            choices = annotationsChoices,
                            selected = names(annotationsChoices)[grep("Kinase", names(annotationsChoices), ignore.case = TRUE)[1]]),
-               selectInput("biomartFile", "BioMart Mapping File (annotations):",
+               selectInput("biomartFile", "BioMart Identifier Mapping File (annotations):",
                            choices = annotationsChoices,
                            selected = names(annotationsChoices)[grep("mart", names(annotationsChoices), ignore.case = TRUE)[1]]),
                br(),
@@ -404,7 +404,6 @@ server <- function(input, output, session) {
         filter(EnsemblProt %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
         mutate(name = paste0(name, "_ptm")) %>% 
         select(SUID, name)
-       ## pie.nodes <- c()
       for (p in matching.nodes.prot.pie$SUID) {
         ptm.name <- matching.nodes.prot.pie$name[matching.nodes.prot.pie$SUID == p]
         suid.list <- addCyNodes(node.names = ptm.name, skip.duplicate.names = FALSE)
@@ -440,7 +439,7 @@ server <- function(input, output, session) {
       setNodeBorderColorDefault("#737373", style.name = style.name)
       ##The next line will remove the main node label on pie chart nodes, leaving the omicsvisualizer label for each site
       ##setNodeLabelBypass(ptm.nodes, '')
-      setNodeFontSizeBypass(ptm.nodes, '9')
+      setNodeFontSizeBypass(ptm.nodes, 9)
       
       loadTableData(cptac.protein.ccrcc, data.key.column = "ensembl", 
                     table = "node", table.key.column = 'Ensembl')
