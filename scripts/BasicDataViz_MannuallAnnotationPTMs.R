@@ -96,6 +96,13 @@ setNodeBorderColorDefault("#737373", style.name = style.name)
 
 ## Remove bypasses for ptm nodes that will interfere with data visualization
 setNodeFontSizeBypass(ptm.nodes$SUID, 9)
+
+for (s in ptm.nodes$SUID) {
+  clearNodePropertyBypass(s, visual.property = "NODE_FILL_COLOR")
+  clearNodePropertyBypass(s, visual.property = "NODE_LABEL")
+}
+
+## The above for loop is a workaround due to a bug in RCy3. Once the bug is fixed, it should be updated to:
 ##clearNodePropertyBypass(node.names = ptm.nodes$SUID, visual.property = "NODE_FILL_COLOR") ## this doesnt work
 ##clearNodePropertyBypass(node.names = ptm.nodes$SUID, visual.property = "NODE_LABEL") ## this doesnt work
 
