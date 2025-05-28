@@ -33,8 +33,10 @@ list_txt_files <- function(path) {
 datasetsChoices <- list_txt_files("../datasets")
 # For the PROGENy subfolder (all .txt files)
 progenyChoices  <- list_txt_files("../datasets/PROGENy")
-# For the annotations folder (all .txt files)
-annotationsChoices <- list_txt_files("../annotations")
+# For the kinase-substrate mapping folder (all .txt files)
+kinasemappingChoices <- list_txt_files("../annotations/kinase")
+# For the identifier mapping folder (all .txt files)
+identifiermappingChoices <- list_txt_files("../annotations/mapping")
 
 ## -----------------------
 ## Shiny UI
@@ -49,21 +51,21 @@ ui <- navbarPage(
            sidebarLayout(
              sidebarPanel(
                h4("Select Data Files"),
-               selectInput("phosphoFile", "Phosphoproteomics Data File (datasets):",
+               selectInput("phosphoFile", "Phosphoproteomics Data File:",
                            choices = datasetsChoices,
                            selected = names(datasetsChoices)[grep("phospho", names(datasetsChoices), ignore.case = TRUE)[1]]),
                selectInput("proteinFile", "Proteomics Data File (datasets):",
                            choices = datasetsChoices,
                            selected = names(datasetsChoices)[grep("protein", names(datasetsChoices), ignore.case = TRUE)[1]]),
-               selectInput("progenyFile", "PROGENy Data File (datasets/PROGENy):",
+               selectInput("progenyFile", "PROGENy Data File:",
                            choices = progenyChoices,
                            selected = names(progenyChoices)[1]),
-               selectInput("kinaseFile", "Kinase-Substrate File (annotations):",
-                           choices = annotationsChoices,
-                           selected = names(annotationsChoices)[grep("Kinase", names(annotationsChoices), ignore.case = TRUE)[1]]),
-               selectInput("biomartFile", "BioMart Identifier Mapping File (annotations):",
-                           choices = annotationsChoices,
-                           selected = names(annotationsChoices)[grep("mart", names(annotationsChoices), ignore.case = TRUE)[1]]),
+               selectInput("kinaseFile", "Kinase-Substrate Mapping File:",
+                           choices = kinasemappingChoices,
+                           selected = names(kinasemappingChoices)[grep("Kinase", names(kinasemappingChoices), ignore.case = TRUE)[1]]),
+               selectInput("biomartFile", "Identifier Mapping File:",
+                           choices = identifiermappingChoices,
+                           selected = names(identifiermappingChoices)[grep("mart", names(identifiermappingChoices), ignore.case = TRUE)[1]]),
                br(),
                actionButton("goToAnalysis", "Proceed to Analysis")
              ),
