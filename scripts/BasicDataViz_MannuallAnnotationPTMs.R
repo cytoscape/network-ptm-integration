@@ -43,11 +43,12 @@ cptac.protein <- read.csv("../datasets/CPTAC_protein_tn.txt", stringsAsFactors =
 ## Get BioMART mapping info for Ensembl protein id to Uniprot-Swissprot, to enable data mapping between node table and CPTAC data using EnsemblProt id.
 ## Manually annotated ptms on pathways are annotated with Uniprot-Swissprot identifiers.
 ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
-ensemblprot_swissprot <- getBM(attributes=c('ensembl_peptide_id','hgnc_symbol','uniprotswissprot'), mart = ensembl)
+ensemblprot_swissprot <- getBM(attributes=c('ensembl_peptide_id','hgnc_symbol','uniprotswissprot', 'ensembl_gene_id'), mart = ensembl)
 ensemblprot_swissprot_sub <- ensemblprot_swissprot %>%
   filter(!is.na(uniprotswissprot), uniprotswissprot != "")
 
 ensemblprot_swissprot_sub <- ensemblprot_swissprot_sub[, c("ensembl_peptide_id", "uniprotswissprot")]
+ensembl_swissprot_sub <- unique(ensemblprot_swissprot_sub[, c("ensembl_gene_id", "uniprotswissprot")])
 
 ###############
 ## Open the relevant WP in Cytoscape. The below example uses the EGFR pathway.

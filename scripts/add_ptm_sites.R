@@ -54,7 +54,7 @@ ui <- navbarPage(
                selectInput("phosphoFile", "Phosphoproteomics Data File:",
                            choices = datasetsChoices,
                            selected = names(datasetsChoices)[grep("phospho", names(datasetsChoices), ignore.case = TRUE)[1]]),
-               selectInput("proteinFile", "Proteomics Data File (datasets):",
+               selectInput("proteinFile", "Proteomics Data File:",
                            choices = datasetsChoices,
                            selected = names(datasetsChoices)[grep("protein", names(datasetsChoices), ignore.case = TRUE)[1]]),
                selectInput("progenyFile", "PROGENy Data File:",
@@ -257,9 +257,7 @@ server <- function(input, output, session) {
     cptac.protein <- read.csv(input$proteinFile, stringsAsFactors = FALSE, sep = "\t")
     cptac.progeny.egfr <- read.csv(input$progenyFile, stringsAsFactors = FALSE, sep = "\t")
     psp.data <- read.csv(input$kinaseFile, stringsAsFactors = FALSE, sep = "\t")
-    biomart <- read.csv(input$biomartFile, stringsAsFactors = FALSE, sep = ",") %>%
-      rename(Ensembl = Gene.stable.ID, EnsemblProt = Protein.stable.ID) %>%
-      select(Ensembl, EnsemblProt)
+    biomart <- read.csv(input$biomartFile, stringsAsFactors = FALSE, sep = "\t")
     
     ## -----------------------
     ## Preprocess Data from Datasets
@@ -280,7 +278,7 @@ server <- function(input, output, session) {
     import_cmd <- paste0('wikipathways import-as-pathway id=', wpid)
     RCy3::commandsRun(import_cmd)
     
-    # Remove existing PTM nodes (nodes labeled "p")
+    # Remove existing PTM nodes (nodes labeled "p"). This is specific for data-driven modes.
     selectNodes(nodes = "p", by.col = "name", preserve.current.selection = FALSE) 
     deleteSelectedNodes()
     
@@ -291,11 +289,12 @@ server <- function(input, output, session) {
     node.table.prot <- node.table %>% 
       filter(Type %in% c("Protein", "GeneProduct")) %>%
       select(SUID, name, XrefId, Ensembl)
-    node.table.prot.mapped <- merge(node.table.prot, biomart, by = "Ensembl") %>%
-      filter(EnsemblProt != "")
+    node.table.prot.mapped <- merge(node.table.prot, biomart, by.x = "Ensembl", by.y = "ensembl_gene_id") %>%
+      filter(ensembl_peptide_id != "") %>%
+      filter(uniprotswissprot != "")
     matching.nodes.prot <- node.table.prot.mapped %>% 
-      filter(EnsemblProt %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
-      select(SUID, name, EnsemblProt)
+      filter(ensembl_peptide_id %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
+      select(SUID, name, ensembl_peptide_id)
     node.positions <- getNodePosition(node.names = matching.nodes.prot$SUID)
     node.positions <- cbind(suid = rownames(node.positions), node.positions)
     rownames(node.positions) <- 1:nrow(node.positions)
@@ -311,17 +310,46 @@ server <- function(input, output, session) {
     node.layout <- merge(node.layout, node.positions, by = "suid")
     node.layout.pie <- node.layout  # For alternative (pie chart) viz
     matching.nodes.phospho <- cptac.progeny.egfr.ccrcc.pos %>%
-      filter(protein %in% node.table.prot.mapped$EnsemblProt) %>%
+      filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
       mutate(prot_site = paste0(protein, "_", site)) %>%
       select(symbol, protein, site, prot_site)
     
     if (analysisMode == "kinase") {
       psp.data.human <- psp.data %>%
         filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") %>% 
-        mutate(prot_site = paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>% 
+        mutate(SUB_MOD_RSD = str_replace(SUB_MOD_RSD, "^S", "ser"),
+               SUB_MOD_RSD = str_replace(SUB_MOD_RSD, "^T", "thr"),
+               SUB_MOD_RSD = str_replace(SUB_MOD_RSD, "^Y", "tyr")) %>%
+        mutate(prot_site = paste0(SUB_ACC_ID, "_", SUB_MOD_RSD)) %>%
+        select(GENE, KIN_ACC_ID, prot_site, SUB_ACC_ID)
+      
+      # ## data mapping
+      # psp.data.human.mapped <- merge(psp.data.human, biomart, by.x = "KIN_ACC_ID", by.y = "uniprotswissprot") %>%
+      #   mutate(kinase_ensembl_id = ensembl_gene_id) %>%
+      #   select(KIN_ACC_ID, kinase_ensembl_id, prot_site)
+      # 
+      # ## Get filtered list of ptms by filtering for those with kinases on the pw.
+      # filtered.ptms <- psp.data.human.mapped %>%
+      #   filter (prot_site %in% node.table.ptm$data_mapping_id) %>%
+      #   filter (kinase_ensembl_id %in% node.table.prot$Ensembl) %>%
+      #   select (prot_site)
+      # 
+      # filtered.ptms <- unique(filtered.ptms)
+      # 
+      # # ## Get the SUIDs for the filtered list of ptms. This is the list to use for adding ptms in data-driven mode.
+      # # filtered.ptms.suid <- node.table.ptm %>%
+      # #   filter(data_mapping_id %in% filtered.ptms$SUB_ACC_ID_SITE) %>%
+      # #   select(SUID, data_mapping_id, name) 
+      # 
+      # matching.nodes.phospho <- matching.nodes.phospho %>%
+      #   filter(prot_site %in% filtered.ptms)
+      
+      psp.data.human <- psp.data %>%
+        filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") %>%
+        mutate(prot_site = paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>%
         select(GENE, prot_site, SUBSTRATE, SUB_MOD_RSD)
       kinase.pw <- intersect(psp.data.human$GENE, node.table.prot$name)
-      matching.nodes.phospho <- inner_join(matching.nodes.phospho, psp.data.human, 
+      matching.nodes.phospho <- inner_join(matching.nodes.phospho, psp.data.human,
                                            by = c("symbol" = "GENE")) %>%
         filter(symbol %in% kinase.pw) %>%
         select(symbol, prot_site, site)
@@ -350,7 +378,7 @@ server <- function(input, output, session) {
       site.table <- matching.nodes.phospho
       ptms.all <- data.frame()
       for (p in matching.nodes.prot$SUID) {
-        prot <- matching.nodes.prot$EnsemblProt[matching.nodes.prot$SUID == p]
+        prot <- matching.nodes.prot$ensembl_peptide_id[matching.nodes.prot$SUID == p]
         message("Processing protein (Traditional): ", prot)
         phospho.nodes <- site.table %>% 
           filter(protein == prot) %>% 
@@ -403,7 +431,7 @@ server <- function(input, output, session) {
                   paste0(cytoscapeSampleDataPath, "cptac.phospho.ccrcc.full.txt"),
                   sep = "\t", row.names = FALSE)
       matching.nodes.prot.pie <- node.table.prot.mapped %>% 
-        filter(EnsemblProt %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
+        filter(ensembl_peptide_id %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
         mutate(name = paste0(name, "_ptm")) %>% 
         select(SUID, name)
       for (p in matching.nodes.prot.pie$SUID) {
