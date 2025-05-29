@@ -317,42 +317,33 @@ server <- function(input, output, session) {
     if (analysisMode == "kinase") {
       psp.data.human <- psp.data %>%
         filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") %>% 
-        mutate(SUB_MOD_RSD = str_replace(SUB_MOD_RSD, "^S", "ser"),
-               SUB_MOD_RSD = str_replace(SUB_MOD_RSD, "^T", "thr"),
-               SUB_MOD_RSD = str_replace(SUB_MOD_RSD, "^Y", "tyr")) %>%
-        mutate(prot_site = paste0(SUB_ACC_ID, "_", SUB_MOD_RSD)) %>%
-        select(GENE, KIN_ACC_ID, prot_site, SUB_ACC_ID)
+        select(GENE, KINASE, KIN_ACC_ID, SUB_ACC_ID, SUB_MOD_RSD)
       
-      # ## data mapping
-      # psp.data.human.mapped <- merge(psp.data.human, biomart, by.x = "KIN_ACC_ID", by.y = "uniprotswissprot") %>%
-      #   mutate(kinase_ensembl_id = ensembl_gene_id) %>%
-      #   select(KIN_ACC_ID, kinase_ensembl_id, prot_site)
-      # 
-      # ## Get filtered list of ptms by filtering for those with kinases on the pw.
-      # filtered.ptms <- psp.data.human.mapped %>%
-      #   filter (prot_site %in% node.table.ptm$data_mapping_id) %>%
-      #   filter (kinase_ensembl_id %in% node.table.prot$Ensembl) %>%
-      #   select (prot_site)
-      # 
-      # filtered.ptms <- unique(filtered.ptms)
-      # 
-      # # ## Get the SUIDs for the filtered list of ptms. This is the list to use for adding ptms in data-driven mode.
-      # # filtered.ptms.suid <- node.table.ptm %>%
-      # #   filter(data_mapping_id %in% filtered.ptms$SUB_ACC_ID_SITE) %>%
-      # #   select(SUID, data_mapping_id, name) 
-      # 
-      # matching.nodes.phospho <- matching.nodes.phospho %>%
-      #   filter(prot_site %in% filtered.ptms)
+      ## data mapping
+      psp.data.human.mapped <- merge(psp.data.human, biomart, by.x = "KIN_ACC_ID", by.y = "uniprotswissprot") %>%
+        mutate(kinase_ensembl_id = ensembl_gene_id) %>%
+        mutate(prot_site = paste0(ensembl_peptide_id, "_", SUB_MOD_RSD)) %>%
+        select(GENE, KINASE, KIN_ACC_ID, kinase_ensembl_id, SUB_ACC_ID, ensembl_peptide_id, prot_site, SUB_MOD_RSD)
+
+      ## Get filtered list of ptms by filtering for those with kinases on the pw.
+      filtered.ptms <- psp.data.human.mapped %>%
+        filter (prot_site %in% matching.nodes.phospho$prot_site) %>%
+        filter (kinase_ensembl_id %in% node.table.prot$Ensembl) %>%
+        select (prot_site)
+      filtered.ptms <- unique(filtered.ptms)
+    
+      matching.nodes.phospho <- matching.nodes.phospho %>%
+        filter(prot_site %in% filtered.ptms$prot_site)
       
-      psp.data.human <- psp.data %>%
-        filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") %>%
-        mutate(prot_site = paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>%
-        select(GENE, prot_site, SUBSTRATE, SUB_MOD_RSD)
-      kinase.pw <- intersect(psp.data.human$GENE, node.table.prot$name)
-      matching.nodes.phospho <- inner_join(matching.nodes.phospho, psp.data.human,
-                                           by = c("symbol" = "GENE")) %>%
-        filter(symbol %in% kinase.pw) %>%
-        select(symbol, prot_site, site)
+      # psp.data.human <- psp.data %>%
+      #   filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") %>%
+      #   mutate(prot_site = paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>%
+      #   select(GENE, prot_site, SUBSTRATE, SUB_MOD_RSD)
+      # kinase.pw <- intersect(psp.data.human$GENE, node.table.prot$name)
+      # matching.nodes.phospho <- inner_join(matching.nodes.phospho, psp.data.human,
+      #                                      by = c("symbol" = "GENE")) %>%
+      #   filter(symbol %in% kinase.pw) %>%
+      #   select(symbol, prot_site, site)
     }
     
     ## -----------------------------
