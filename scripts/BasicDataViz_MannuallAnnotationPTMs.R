@@ -61,11 +61,18 @@ ptm.nodes <- node.table %>%
   filter(ptm == 'p')
 
 ## Add a new column, data_mapping_id, for data mapping. A new data frame is created with the new column and then read into the Cytoscape node table.
-## The new data mapping column will contain a new id which is a composite of the parent id (Uniprot) and ptm site information, for example P27361_thr202.
+## The new data mapping column will contain a new id which is a composite of the parent id (Uniprot) and ptm site information, for example P27361_T202.
+## The proteomics data has the ptm site information in a different format, i.e. S233 vs ser233.
 node.table.ptm <- node.table %>% 
   filter(ptm == 'p') %>%
   mutate(data_mapping_id=paste0(parentid, "_", position)) %>% 
-  mutate(name=position) %>% 
+  mutate(data_mapping_id = str_replace(data_mapping_id, "ser", "S"),
+         data_mapping_id = str_replace(data_mapping_id, "thr", "T"),
+         data_mapping_id = str_replace(data_mapping_id, "tyr", "Y")) %>%
+  mutate(name=position) %>%
+  mutate(name = str_replace(name, "^ser", "S"),
+         name = str_replace(name, "^thr", "T"),
+         name = str_replace(name, "^tyr", "Y")) %>%
   select(SUID, data_mapping_id, name)
 
 loadTableData(node.table.ptm, data.key.column="SUID", "node", table.key.column = 'SUID') ## load the new column into Cytoscape
@@ -78,12 +85,16 @@ node.table.ensembl <- node.table %>%
 
 loadTableData(node.table.ensembl, data.key.column="SUID", "node", table.key.column = 'SUID') ## load the new column into Cytoscape
 
+## Remove bypasses for ptm nodes that will interfere with data visualization
+setNodeFontSizeBypass(ptm.nodes$SUID, 9)
+
+for (s in ptm.nodes$SUID) {
+  clearNodePropertyBypass(s, visual.property = "NODE_FILL_COLOR")
+  clearNodePropertyBypass(s, visual.property = "NODE_LABEL")
+}
+
 ## Map phosphoproteomics data from Ensembl Prot ids to Swissprot using Biomart data mapping.
-## The proteomics data has the ptm site information in a different format, i.e. S233 vs ser233, so we need to translate that as well to match the ptms in the network.
 cptac.phospho.mapped <- merge(cptac.phospho, ensemblprot_swissprot_sub, by.x = "protein", by.y = "ensembl_peptide_id") %>%
-  mutate(site = str_replace(site, "^S", "ser"),
-         site = str_replace(site, "^T", "thr"),
-         site = str_replace(site, "^Y", "tyr")) %>%
   mutate(prot_site=paste0(uniprotswissprot, "_", site))
 
 ## Load phosphoproteomics and proteomics data into Cytoscape, using the newly added data_mapping_id column.
@@ -94,14 +105,6 @@ loadTableData(cptac.protein, data.key.column="ensembl", "node", table.key.column
 style.name = "WikiPathways"
 setNodeColorDefault('#FFFFFF', style.name = style.name)
 setNodeBorderColorDefault("#737373", style.name = style.name)
-
-## Remove bypasses for ptm nodes that will interfere with data visualization
-setNodeFontSizeBypass(ptm.nodes$SUID, 9)
-
-for (s in ptm.nodes$SUID) {
-  clearNodePropertyBypass(s, visual.property = "NODE_FILL_COLOR")
-  clearNodePropertyBypass(s, visual.property = "NODE_LABEL")
-}
 
 ## The above for loop is a workaround due to a bug in RCy3. Once the bug is fixed, it should be updated to:
 ##clearNodePropertyBypass(node.names = ptm.nodes$SUID, visual.property = "NODE_FILL_COLOR") ## this doesnt work
