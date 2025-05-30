@@ -33,6 +33,8 @@ list_txt_files <- function(path) {
 datasetsChoices <- list_txt_files("../datasets")
 # For the PROGENy subfolder (all .txt files)
 progenyChoices  <- list_txt_files("../datasets/PROGENy")
+# For the CPTAC cancer type
+cptacChoices <- c("CCRCC", "COAD", "HNSCC", "LSCC", "LUAD", "OV", "PDAC", "UCEC")
 # For the kinase-substrate mapping folder (all .txt files)
 kinasemappingChoices <- list_txt_files("../annotations/kinase")
 # For the identifier mapping folder (all .txt files)
@@ -60,6 +62,9 @@ ui <- navbarPage(
                selectInput("progenyFile", "PROGENy Data File:",
                            choices = progenyChoices,
                            selected = names(progenyChoices)[1]),
+               selectInput("cptacType", "CPTAC Cancer Type:",
+                           choices = cptacChoices,
+                           selected = names(cptacChoices)[1]),
                selectInput("kinaseFile", "Kinase-Substrate Mapping File:",
                            choices = kinasemappingChoices,
                            selected = names(kinasemappingChoices)[grep("Kinase", names(kinasemappingChoices), ignore.case = TRUE)[1]]),
@@ -223,6 +228,7 @@ server <- function(input, output, session) {
       Phospho = input$phosphoFile,
       Protein = input$proteinFile,
       PROGENy = input$progenyFile,
+      CPTAC_Cancer_Type = input$cptacType,
       Kinase_Substrate = input$kinaseFile,
       BioMart = input$biomartFile
     )
@@ -262,15 +268,18 @@ server <- function(input, output, session) {
     ## -----------------------
     ## Preprocess Data from Datasets
     ## -----------------------
-    cptac.progeny.egfr.ccrcc.pos <- cptac.progeny.egfr %>%
-      filter(CCRCC.pval > 0 & CCRCC.pval < 0.05) %>%
+    
+    type.pval <- paste0(input$cptacType, ".pval")
+    type.val <- paste0(input$cptacType, ".val")
+    cptac.progeny.egfr.pos <- cptac.progeny.egfr %>%
+      filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05) %>%
       mutate(prot_site = paste0(protein, "_", site)) %>% 
-      select(symbol, protein, site, prot_site, CCRCC.val, CCRCC.pval)
-    cptac.phospho.ccrcc <- cptac.phospho %>% 
-      select(symbol, site, protein, prot_site, CCRCC.val, CCRCC.pval)
-    cptac.protein.ccrcc <- cptac.protein %>% 
-      select(ensembl, symbol, CCRCC.val, CCRCC.pval) %>%
-      filter(!is.na(CCRCC.pval) & !is.na(CCRCC.pval))
+      select(symbol, protein, site, prot_site, all_of(type.val), all_of(type.pval))
+    cptac.phospho.type <- cptac.phospho %>% 
+      select(symbol, site, protein, prot_site, all_of(type.val), all_of(type.pval))
+    cptac.protein.type <- cptac.protein %>% 
+      select(ensembl, symbol, all_of(type.val), all_of(type.pval)) %>%
+      filter(!is.na(.data[[type.pval]]) & !is.na(.data[[type.pval]]))
     
     ## -----------------------
     ## Import Pathway into Cytoscape
@@ -293,7 +302,7 @@ server <- function(input, output, session) {
       filter(ensembl_peptide_id != "") %>%
       filter(uniprotswissprot != "")
     matching.nodes.prot <- node.table.prot.mapped %>% 
-      filter(ensembl_peptide_id %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
+      filter(ensembl_peptide_id %in% cptac.progeny.egfr.pos$protein) %>% 
       select(SUID, name, ensembl_peptide_id)
     node.positions <- getNodePosition(node.names = matching.nodes.prot$SUID)
     node.positions <- cbind(suid = rownames(node.positions), node.positions)
@@ -309,7 +318,7 @@ server <- function(input, output, session) {
     node.layout <- merge(node.width, node.height, by = "suid")
     node.layout <- merge(node.layout, node.positions, by = "suid")
     node.layout.pie <- node.layout  # For alternative (pie chart) viz
-    matching.nodes.phospho <- cptac.progeny.egfr.ccrcc.pos %>%
+    matching.nodes.phospho <- cptac.progeny.egfr.pos %>%
       filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
       mutate(prot_site = paste0(protein, "_", site)) %>%
       select(symbol, protein, site, prot_site)
@@ -334,16 +343,6 @@ server <- function(input, output, session) {
     
       matching.nodes.phospho <- matching.nodes.phospho %>%
         filter(prot_site %in% filtered.ptms$prot_site)
-      
-      # psp.data.human <- psp.data %>%
-      #   filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") %>%
-      #   mutate(prot_site = paste0(SUBSTRATE, "_", SUB_MOD_RSD)) %>%
-      #   select(GENE, prot_site, SUBSTRATE, SUB_MOD_RSD)
-      # kinase.pw <- intersect(psp.data.human$GENE, node.table.prot$name)
-      # matching.nodes.phospho <- inner_join(matching.nodes.phospho, psp.data.human,
-      #                                      by = c("symbol" = "GENE")) %>%
-      #   filter(symbol %in% kinase.pw) %>%
-      #   select(symbol, prot_site, site)
     }
     
     ## -----------------------------
@@ -395,11 +394,11 @@ server <- function(input, output, session) {
       setNodeFontSizeBypass(ptms.all$SUID, 9)
       setNodeWidthBypass(ptms.all$SUID, 35)
       setNodeHeightBypass(ptms.all$SUID, 20)
-      loadTableData(cptac.protein.ccrcc, data.key.column = "ensembl", 
+      loadTableData(cptac.protein.type, data.key.column = "ensembl", 
                     table = "node", table.key.column = 'Ensembl')
-      loadTableData(cptac.phospho.ccrcc, data.key.column = "prot_site", 
+      loadTableData(cptac.phospho.type, data.key.column = "prot_site", 
                     table = "node", table.key.column = 'shared name')
-      RCy3::setNodeColorMapping('CCRCC.val', colors = paletteColorBrewerRdBu, 
+      RCy3::setNodeColorMapping(table.column = type.val, colors = paletteColorBrewerRdBu, 
                                 style.name = style.name)
       ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == prot_site))
       ptms.all.data.site <- ptms.all.data %>%
@@ -415,14 +414,14 @@ server <- function(input, output, session) {
       node.layout.pie <- node.layout.pie %>%
         mutate(x.ptm = (x_location + node.width / 2 + 20)) %>%
         mutate(y.ptm = y_location)
-      cptac.phospho.ccrcc.full.ov <- cptac.phospho.ccrcc %>%
-        filter(prot_site %in% cptac.progeny.egfr.ccrcc.pos$prot_site) %>%
+      cptac.phospho.type.full.ov <- cptac.phospho.type %>%
+        filter(prot_site %in% cptac.progeny.egfr.pos$prot_site) %>%
         mutate(symbol_ptm = paste0(symbol, "_ptm"))
-      write.table(cptac.phospho.ccrcc.full.ov, 
-                  paste0(cytoscapeSampleDataPath, "cptac.phospho.ccrcc.full.txt"),
+      write.table(cptac.phospho.type.full.ov, 
+                  paste0(cytoscapeSampleDataPath, "cptac.phospho.type.full.txt"),
                   sep = "\t", row.names = FALSE)
       matching.nodes.prot.pie <- node.table.prot.mapped %>% 
-        filter(ensembl_peptide_id %in% cptac.progeny.egfr.ccrcc.pos$protein) %>% 
+        filter(ensembl_peptide_id %in% cptac.progeny.egfr.pos$protein) %>% 
         mutate(name = paste0(name, "_ptm")) %>% 
         select(SUID, name)
       for (p in matching.nodes.prot.pie$SUID) {
@@ -437,8 +436,8 @@ server <- function(input, output, session) {
       }
       ovload.cmd <- paste('ov load',
                           'dataTypeList="string,string,string,string,double,double,string"', 
-                          paste0('file="', cytoscapeSampleDataPath, "cptac.phospho.ccrcc.full.txt\""),
-                          'newTableName="cptac.phospho.ccrcc.full"', 
+                          paste0('file="', cytoscapeSampleDataPath, "cptac.phospho.type.full.txt\""),
+                          'newTableName="cptac.phospho.type.full"', 
                           'startLoadRow="2"')
       commandsRun(ovload.cmd)
       ovconnect.cmd <- paste('ov connect',
@@ -446,7 +445,7 @@ server <- function(input, output, session) {
                              'mappingColTable="symbol_ptm"')
       commandsRun(ovconnect.cmd)
       ovviz.cmd <- paste('ov viz apply inner continuous',
-                         'attributes="CCRCC.val"', 
+                         paste0('attributes="', type.val, '"'), 
                          'paletteName="Red-Blue"', 
                          'labels="site"')
       commandsRun(ovviz.cmd)
@@ -462,9 +461,9 @@ server <- function(input, output, session) {
       ##setNodeLabelBypass(ptm.nodes, '')
       setNodeFontSizeBypass(ptm.nodes, 9)
       
-      loadTableData(cptac.protein.ccrcc, data.key.column = "ensembl", 
+      loadTableData(cptac.protein.type, data.key.column = "ensembl", 
                     table = "node", table.key.column = 'Ensembl')
-      RCy3::setNodeColorMapping('CCRCC.val', colors = paletteColorBrewerRdBu, 
+      RCy3::setNodeColorMapping(table.column = type.val, colors = paletteColorBrewerRdBu, 
                                 style.name = style.name)
       output$status <- renderText({
         paste("Pie Chart visualization complete for WikiPathway", wpid)
