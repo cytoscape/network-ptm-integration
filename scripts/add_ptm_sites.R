@@ -261,7 +261,7 @@ server <- function(input, output, session) {
     cptac.phospho <- read.csv(input$phosphoFile, stringsAsFactors = FALSE, sep = "\t") %>% 
       mutate(prot_site = paste0(protein, "_", site))
     cptac.protein <- read.csv(input$proteinFile, stringsAsFactors = FALSE, sep = "\t")
-    cptac.progeny.egfr <- read.csv(input$progenyFile, stringsAsFactors = FALSE, sep = "\t")
+    cptac.progeny <- read.csv(input$progenyFile, stringsAsFactors = FALSE, sep = "\t")
     psp.data <- read.csv(input$kinaseFile, stringsAsFactors = FALSE, sep = "\t")
     biomart <- read.csv(input$biomartFile, stringsAsFactors = FALSE, sep = "\t")
     
@@ -271,7 +271,9 @@ server <- function(input, output, session) {
     
     type.pval <- paste0(input$cptacType, ".pval")
     type.val <- paste0(input$cptacType, ".val")
-    cptac.progeny.egfr.pos <- cptac.progeny.egfr %>%
+    progenyfilename <- sub("\\.txt$", "", input$progenyFile)
+    progenypw <- tolower(strsplit(progenyfilename, "__")[[1]][2])
+    cptac.progeny.pos <- cptac.progeny %>%
       filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05) %>%
       mutate(prot_site = paste0(protein, "_", site)) %>% 
       select(symbol, protein, site, prot_site, all_of(type.val), all_of(type.pval))
@@ -302,7 +304,7 @@ server <- function(input, output, session) {
       filter(ensembl_peptide_id != "") %>%
       filter(uniprotswissprot != "")
     matching.nodes.prot <- node.table.prot.mapped %>% 
-      filter(ensembl_peptide_id %in% cptac.progeny.egfr.pos$protein) %>% 
+      filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>% 
       select(SUID, name, ensembl_peptide_id)
     node.positions <- getNodePosition(node.names = matching.nodes.prot$SUID)
     node.positions <- cbind(suid = rownames(node.positions), node.positions)
@@ -318,7 +320,7 @@ server <- function(input, output, session) {
     node.layout <- merge(node.width, node.height, by = "suid")
     node.layout <- merge(node.layout, node.positions, by = "suid")
     node.layout.pie <- node.layout  # For alternative (pie chart) viz
-    matching.nodes.phospho <- cptac.progeny.egfr.pos %>%
+    matching.nodes.phospho <- cptac.progeny.pos %>%
       filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
       mutate(prot_site = paste0(protein, "_", site)) %>%
       select(symbol, protein, site, prot_site)
@@ -415,13 +417,13 @@ server <- function(input, output, session) {
         mutate(x.ptm = (x_location + node.width / 2 + 20)) %>%
         mutate(y.ptm = y_location)
       cptac.phospho.type.full.ov <- cptac.phospho.type %>%
-        filter(prot_site %in% cptac.progeny.egfr.pos$prot_site) %>%
+        filter(prot_site %in% cptac.progeny.pos$prot_site) %>%
         mutate(symbol_ptm = paste0(symbol, "_ptm"))
       write.table(cptac.phospho.type.full.ov, 
                   paste0(cytoscapeSampleDataPath, "cptac.phospho.type.full.txt"),
                   sep = "\t", row.names = FALSE)
       matching.nodes.prot.pie <- node.table.prot.mapped %>% 
-        filter(ensembl_peptide_id %in% cptac.progeny.egfr.pos$protein) %>% 
+        filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>% 
         mutate(name = paste0(name, "_ptm")) %>% 
         select(SUID, name)
       for (p in matching.nodes.prot.pie$SUID) {
