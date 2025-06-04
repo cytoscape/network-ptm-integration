@@ -350,6 +350,10 @@ server <- function(input, output, session) {
     ## -----------------------------
     ## Visualization Branching
     ## -----------------------------
+    
+    #message("Number of phospho nodes: ", nrow(matching.nodes.phospho))
+    if (nrow(matching.nodes.phospho) > 0){
+      
     if (vizMode == "Traditional PTM") {
       node.layout <- node.layout %>%
         mutate(x.ptm = pmap(list(x_location, node.width), 
@@ -469,6 +473,12 @@ server <- function(input, output, session) {
                                 style.name = style.name)
       output$status <- renderText({
         paste("Pie Chart visualization complete for WikiPathway", wpid)
+      })
+    }
+    }
+    else {
+      output$status <- renderText({
+        paste("There are no no matching phospho sites.")
       })
     }
     
