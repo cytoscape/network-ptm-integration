@@ -242,7 +242,7 @@ server <- function(input, output, session) {
   observeEvent(input$run, {
     req(input$wpid, input$vizMode, input$analysisMode,
         input$phosphoFile, input$proteinFile, input$progenyFile,
-        input$kinaseFile, input$biomartFile)
+        input$cptacType, input$kinaseFile, input$biomartFile)
     
     # Retrieve user selections
     wpid         <- input$wpid
@@ -296,6 +296,8 @@ server <- function(input, output, session) {
     ## -----------------------------
     ## Common Steps: Node & Data Setup
     ## -----------------------------
+    
+    ## Get nodes in the pathway, specifically protein nodes, and map them to Ensembl protein ids
     node.table <- RCy3::getTableColumns(table = "node")
     node.table.prot <- node.table %>% 
       filter(Type %in% c("Protein", "GeneProduct")) %>%
@@ -303,40 +305,41 @@ server <- function(input, output, session) {
     node.table.prot.mapped <- merge(node.table.prot, biomart, by.x = "Ensembl", by.y = "ensembl_gene_id") %>%
       filter(ensembl_peptide_id != "") %>%
       filter(uniprotswissprot != "")
-    matching.nodes.prot <- node.table.prot.mapped %>% 
-      filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>% 
-      select(SUID, name, ensembl_peptide_id)
-    node.positions <- getNodePosition(node.names = matching.nodes.prot$SUID)
+    
+    ## Get the relevant phospho sites that match the proteins in the node table
+    matching.nodes.phospho <- cptac.progeny.pos %>%
+      filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
+      select(symbol, protein, site, prot_site)
+    
+    ## Get node positions for all protein nodes
+    node.positions <- getNodePosition(node.names = node.table.prot$SUID)
     node.positions <- cbind(suid = rownames(node.positions), node.positions)
     rownames(node.positions) <- 1:nrow(node.positions)
-    node.width <- getNodeWidth(node.names = matching.nodes.prot$SUID)
+    node.width <- getNodeWidth(node.names = node.table.prot$SUID)
     node.width <- as.data.frame(node.width)
     node.width <- cbind(suid = rownames(node.width), node.width)
     rownames(node.width) <- 1:nrow(node.width)
-    node.height <- getNodeHeight(node.names = matching.nodes.prot$SUID)
+    node.height <- getNodeHeight(node.names = node.table.prot$SUID)
     node.height <- as.data.frame(node.height)
     node.height <- cbind(suid = rownames(node.height), node.height)
     rownames(node.height) <- 1:nrow(node.height)
     node.layout <- merge(node.width, node.height, by = "suid")
     node.layout <- merge(node.layout, node.positions, by = "suid")
     node.layout.pie <- node.layout  # For alternative (pie chart) viz
-    matching.nodes.phospho <- cptac.progeny.pos %>%
-      filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
-      mutate(prot_site = paste0(protein, "_", site)) %>%
-      select(symbol, protein, site, prot_site)
     
+    ## For kinase mode, filter for only those phospho sites that have kinases on the pathway
     if (analysisMode == "kinase") {
       psp.data.human <- psp.data %>%
         filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") %>% 
         select(GENE, KINASE, KIN_ACC_ID, SUB_ACC_ID, SUB_MOD_RSD)
       
-      ## data mapping
+      ## Data mapping PSP data
       psp.data.human.mapped <- merge(psp.data.human, biomart, by.x = "KIN_ACC_ID", by.y = "uniprotswissprot") %>%
         mutate(kinase_ensembl_id = ensembl_gene_id) %>%
         mutate(prot_site = paste0(ensembl_peptide_id, "_", SUB_MOD_RSD)) %>%
         select(GENE, KINASE, KIN_ACC_ID, kinase_ensembl_id, SUB_ACC_ID, ensembl_peptide_id, prot_site, SUB_MOD_RSD)
 
-      ## Get filtered list of ptms by filtering for those with kinases on the pw.
+      ## Get filtered list of phospho sites by filtering for those with kinases on the pw.
       filtered.ptms <- psp.data.human.mapped %>%
         filter (prot_site %in% matching.nodes.phospho$prot_site) %>%
         filter (kinase_ensembl_id %in% node.table.prot$Ensembl) %>%
@@ -351,7 +354,16 @@ server <- function(input, output, session) {
     ## Visualization Branching
     ## -----------------------------
     
-    #message("Number of phospho nodes: ", nrow(matching.nodes.phospho))
+    ## Get protein nodes in the node table that correspond to the phospho sites. 
+    ## We can then use this list of existing nodes to add new nodes
+    
+    matching.nodes.prot <- node.table.prot.mapped %>% 
+      filter(ensembl_peptide_id %in% matching.nodes.phospho$protein) %>%
+      select(SUID, name, ensembl_peptide_id)
+    
+    message("Matching protein nodes: ", nrow(matching.nodes.prot))
+    message("Matching phospho nodes: ", nrow(matching.nodes.phospho))
+    
     if (nrow(matching.nodes.phospho) > 0){
       
     if (vizMode == "Traditional PTM") {
