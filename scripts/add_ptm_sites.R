@@ -52,6 +52,9 @@ ui <- navbarPage(
   tabPanel("Data Files",
            sidebarLayout(
              sidebarPanel(
+               h4("Select Method for Adding Phospho sites"),
+               selectInput("phosphoMode", "Phosphosite Mode:",
+                           choices = c("Data-driven: PROGENy", "Data-driven: phosphoproteomics data", "Manually curated")),
                h4("Select Data Files"),
                selectInput("phosphoFile", "Phosphoproteomics Data File:",
                            choices = datasetsChoices,
