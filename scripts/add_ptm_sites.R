@@ -278,7 +278,7 @@ server <- function(input, output, session) {
     
     type.pval <- paste0(input$cptacType, ".pval") ##get relevant column header based on cancer type selected
     type.val <- paste0(input$cptacType, ".val")
-    progenyfilename <- sub("\\.txt$", "", input$progenyFile)
+    #progenyfilename <- sub("\\.txt$", "", input$progenyFile)
     #progenypw <- tolower(strsplit(progenyfilename, "__")[[1]][2]) ##not sure this is needed
     
     ##Get relevant sites based on positive PROGENy scores
@@ -287,22 +287,27 @@ server <- function(input, output, session) {
       mutate(prot_site = paste0(protein, "_", site)) %>% 
       select(symbol, protein, site, prot_site, all_of(type.val), all_of(type.pval))
     
-    ##maybe we don't need a second df here, just keep it cptac.phospho?
-    cptac.phospho.type <- cptac.phospho %>% 
+    cptac.phospho <- cptac.phospho %>% 
       select(symbol, site, protein, prot_site, all_of(type.val), all_of(type.pval))
-    cptac.protein.type <- cptac.protein %>% 
+    cptac.protein <- cptac.protein %>% 
       select(ensembl, symbol, all_of(type.val), all_of(type.pval)) %>%
       filter(!is.na(.data[[type.pval]]) & !is.na(.data[[type.pval]]))
+    
+    ##For Threshold mode
+    cptac.phospho.threshold <- cptac.phospho %>%
+      filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05)
     
     ## -----------------------
     ## Import Pathway into Cytoscape
     ## -----------------------
     import_cmd <- paste0('wikipathways import-as-pathway id=', wpid)
     RCy3::commandsRun(import_cmd)
-    
+  
     # Remove existing PTM nodes (nodes labeled "p"). This is specific for data-driven modes.
+    if (mode %in% c("Data-driven: PROGENy", "Data-driven: phosphoproteomics data")) {
     selectNodes(nodes = "p", by.col = "name", preserve.current.selection = FALSE) 
     deleteSelectedNodes()
+    }
     
     ## -----------------------------
     ## Common Steps: Node & Data Setup
@@ -317,10 +322,18 @@ server <- function(input, output, session) {
       filter(ensembl_peptide_id != "") %>%
       filter(uniprotswissprot != "")
     
-    ## Get the relevant phospho sites that match the proteins in the node table
+    if (analysisMode == "Data-driven: PROGENy"){
+    ## Get the relevant phospho sites from PROGENy that match the proteins in the node table
     matching.nodes.phospho <- cptac.progeny.pos %>%
       filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
       select(symbol, protein, site, prot_site)
+    }
+    
+    if (mode == "Data-driven: phosphoproteomics data"){
+      matching.nodes.phospho <- cptac.phospho.threshold %>%
+        filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
+        select(symbol, protein, site, prot_site)
+    }
     
     ## Get node positions for all protein nodes
     node.positions <- getNodePosition(node.names = node.table.prot$SUID)
@@ -423,9 +436,9 @@ server <- function(input, output, session) {
       setNodeFontSizeBypass(ptms.all$SUID, 9)
       setNodeWidthBypass(ptms.all$SUID, 35)
       setNodeHeightBypass(ptms.all$SUID, 20)
-      loadTableData(cptac.protein.type, data.key.column = "ensembl", 
+      loadTableData(cptac.protein, data.key.column = "ensembl", 
                     table = "node", table.key.column = 'Ensembl')
-      loadTableData(cptac.phospho.type, data.key.column = "prot_site", 
+      loadTableData(cptac.phospho, data.key.column = "prot_site", 
                     table = "node", table.key.column = 'shared name')
       RCy3::setNodeColorMapping(table.column = type.val, colors = paletteColorBrewerRdBu, 
                                 style.name = style.name)
@@ -443,11 +456,11 @@ server <- function(input, output, session) {
       node.layout.pie <- node.layout.pie %>%
         mutate(x.ptm = (x_location + node.width / 2 + 20)) %>%
         mutate(y.ptm = y_location)
-      cptac.phospho.type.full.ov <- cptac.phospho.type %>%
+      cptac.phospho.full.ov <- cptac.phospho %>%
         filter(prot_site %in% cptac.progeny.pos$prot_site) %>%
         mutate(symbol_ptm = paste0(symbol, "_ptm"))
-      write.table(cptac.phospho.type.full.ov, 
-                  paste0(cytoscapeSampleDataPath, "cptac.phospho.type.full.txt"),
+      write.table(cptac.phospho.full.ov, 
+                  paste0(cytoscapeSampleDataPath, "cptac.phospho.full.txt"),
                   sep = "\t", row.names = FALSE)
       matching.nodes.prot.pie <- node.table.prot.mapped %>% 
         filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>% 
@@ -465,8 +478,8 @@ server <- function(input, output, session) {
       }
       ovload.cmd <- paste('ov load',
                           'dataTypeList="string,string,string,string,double,double,string"', 
-                          paste0('file="', cytoscapeSampleDataPath, "cptac.phospho.type.full.txt\""),
-                          'newTableName="cptac.phospho.type.full"', 
+                          paste0('file="', cytoscapeSampleDataPath, "cptac.phospho.full.txt\""),
+                          'newTableName="cptac.phospho.full"', 
                           'startLoadRow="2"')
       commandsRun(ovload.cmd)
       ovconnect.cmd <- paste('ov connect',
@@ -490,7 +503,7 @@ server <- function(input, output, session) {
       ##setNodeLabelBypass(ptm.nodes, '')
       setNodeFontSizeBypass(ptm.nodes, 9)
       
-      loadTableData(cptac.protein.type, data.key.column = "ensembl", 
+      loadTableData(cptac.protein, data.key.column = "ensembl", 
                     table = "node", table.key.column = 'Ensembl')
       RCy3::setNodeColorMapping(table.column = type.val, colors = paletteColorBrewerRdBu, 
                                 style.name = style.name)
