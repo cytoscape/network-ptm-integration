@@ -228,6 +228,7 @@ server <- function(input, output, session) {
   ## Display selected file names in the "Data Files" tab.
   output$selectedFiles <- renderPrint({
     list(
+      Mode = input$phosphoMode,
       Phospho = input$phosphoFile,
       Protein = input$proteinFile,
       PROGENy = input$progenyFile,
@@ -243,7 +244,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$run, {
-    req(input$wpid, input$vizMode, input$analysisMode,
+    req(input$wpid, input$vizMode, input$analysisMode, input$phosphoMode,
         input$phosphoFile, input$proteinFile, input$progenyFile,
         input$cptacType, input$kinaseFile, input$biomartFile)
     
@@ -251,13 +252,16 @@ server <- function(input, output, session) {
     wpid         <- input$wpid
     vizMode      <- input$vizMode        # "Traditional PTM" or "Pie Chart"
     analysisMode <- input$analysisMode     # "all" or "kinase"
+    mode <- input$phosphoMode  #which phospho mode
     
+    ##This doesn't work
     output$status <- renderText({
       paste("Starting analysis with WikiPathway ID:", wpid, 
+            "\nPhospho Mode:", mode,
             "\nVisualization Mode:", vizMode, 
             "\nAnalysis Mode:", analysisMode)
     })
-    
+
     ## -----------------------
     ## Import Files Based on User Selection
     ## -----------------------
@@ -272,14 +276,18 @@ server <- function(input, output, session) {
     ## Preprocess Data from Datasets
     ## -----------------------
     
-    type.pval <- paste0(input$cptacType, ".pval")
+    type.pval <- paste0(input$cptacType, ".pval") ##get relevant column header based on cancer type selected
     type.val <- paste0(input$cptacType, ".val")
     progenyfilename <- sub("\\.txt$", "", input$progenyFile)
-    progenypw <- tolower(strsplit(progenyfilename, "__")[[1]][2])
+    #progenypw <- tolower(strsplit(progenyfilename, "__")[[1]][2]) ##not sure this is needed
+    
+    ##Get relevant sites based on positive PROGENy scores
     cptac.progeny.pos <- cptac.progeny %>%
       filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05) %>%
       mutate(prot_site = paste0(protein, "_", site)) %>% 
       select(symbol, protein, site, prot_site, all_of(type.val), all_of(type.pval))
+    
+    ##maybe we don't need a second df here, just keep it cptac.phospho?
     cptac.phospho.type <- cptac.phospho %>% 
       select(symbol, site, protein, prot_site, all_of(type.val), all_of(type.pval))
     cptac.protein.type <- cptac.protein %>% 
