@@ -6,7 +6,6 @@ BiocManager::install("RCy3")
 library(shiny)
 library(shinythemes)
 library(RCy3)
-library(rWikiPathways)
 library(dplyr)
 library(purrr)
 # Uncomment additional libraries if needed:
@@ -322,7 +321,7 @@ server <- function(input, output, session) {
       filter(ensembl_peptide_id != "") %>%
       filter(uniprotswissprot != "")
     
-    if (analysisMode == "Data-driven: PROGENy"){
+    if (mode == "Data-driven: PROGENy"){
     ## Get the relevant phospho sites from PROGENy that match the proteins in the node table
     matching.nodes.phospho <- cptac.progeny.pos %>%
       filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
@@ -380,7 +379,7 @@ server <- function(input, output, session) {
     
     ## Get protein nodes in the node table that correspond to the phospho sites. 
     ## We can then use this list of existing nodes to add new nodes
-    
+    print(matching.nodes.phospho)
     matching.nodes.prot <- node.table.prot.mapped %>% 
       filter(ensembl_peptide_id %in% matching.nodes.phospho$protein) %>%
       select(SUID, name, ensembl_peptide_id)

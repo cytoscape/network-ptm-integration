@@ -48,7 +48,9 @@ ensemblprot_swissprot_sub <- ensemblprot_swissprot %>%
   filter(!is.na(uniprotswissprot), uniprotswissprot != "")
 
 ensemblprot_swissprot_sub <- ensemblprot_swissprot_sub[, c("ensembl_peptide_id", "uniprotswissprot")]
-ensembl_swissprot_sub <- unique(ensemblprot_swissprot_sub[, c("ensembl_gene_id", "uniprotswissprot")])
+ensembl_swissprot_sub <- ensemblprot_swissprot[, c("ensembl_gene_id", "uniprotswissprot")] %>%
+  filter(!is.na(uniprotswissprot), uniprotswissprot != "")
+ensembl_swissprot_sub <- unique(ensembl_swissprot_sub)
 
 ###############
 ## Open the relevant WP in Cytoscape. The below example uses the EGFR pathway.
@@ -73,7 +75,7 @@ node.table.ptm <- node.table %>%
   mutate(name = str_replace(name, "^ser", "S"),
          name = str_replace(name, "^thr", "T"),
          name = str_replace(name, "^tyr", "Y")) %>%
-  select(SUID, data_mapping_id, name)
+   dplyr::select(SUID, data_mapping_id, name)
 
 loadTableData(node.table.ptm, data.key.column="SUID", "node", table.key.column = 'SUID') ## load the new column into Cytoscape
 
@@ -81,7 +83,7 @@ loadTableData(node.table.ptm, data.key.column="SUID", "node", table.key.column =
 node.table.ensembl <- node.table %>% 
   filter(Type == 'GeneProduct') %>%
   mutate(data_mapping_id=Ensembl) %>% 
-  select(SUID, data_mapping_id)
+  dplyr::select(SUID, data_mapping_id)
 
 loadTableData(node.table.ensembl, data.key.column="SUID", "node", table.key.column = 'SUID') ## load the new column into Cytoscape
 
