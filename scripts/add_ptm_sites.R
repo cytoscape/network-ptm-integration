@@ -344,7 +344,6 @@ server <- function(input, output, session) {
       matching.nodes.phospho <- cptac.phospho.threshold %>%
         filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
         dplyr::select(symbol, protein, site, prot_site)
-      print(matching.nodes.phospho)
     }
     
     ## Get node positions for all protein nodes
@@ -392,7 +391,6 @@ server <- function(input, output, session) {
     
     ## Get protein nodes in the node table that correspond to the phospho sites. 
     ## We can then use this list of existing nodes to add new nodes
-    ##print(matching.nodes.phospho)
     matching.nodes.prot <- node.table.prot.mapped %>% 
       filter(ensembl_peptide_id %in% matching.nodes.phospho$protein) %>%
       dplyr::select(SUID, name, ensembl_peptide_id)
