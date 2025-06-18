@@ -261,11 +261,11 @@ server <- function(input, output, session) {
             "\nAnalysis Mode:", analysisMode)
     })
     
-    ##this doesn't work
+    # #this doesn't work
     # observeEvent({
     #   if (input$phosphoMode == "Manually curated") {
     #     hide(input$progenyFile)
-    #   } 
+    #   }
     # })
 
     ## -----------------------
@@ -273,6 +273,7 @@ server <- function(input, output, session) {
     ## -----------------------
     cptac.phospho <- read.csv(input$phosphoFile, stringsAsFactors = FALSE, sep = "\t") %>% 
       mutate(prot_site = paste0(protein, "_", site))
+    
     cptac.protein <- read.csv(input$proteinFile, stringsAsFactors = FALSE, sep = "\t")
     cptac.progeny <- read.csv(input$progenyFile, stringsAsFactors = FALSE, sep = "\t")
     psp.data <- read.csv(input$kinaseFile, stringsAsFactors = FALSE, sep = "\t")
@@ -284,9 +285,7 @@ server <- function(input, output, session) {
     
     type.pval <- paste0(input$cptacType, ".pval") ##get relevant column header based on cancer type selected
     type.val <- paste0(input$cptacType, ".val")
-    #progenyfilename <- sub("\\.txt$", "", input$progenyFile)
-    #progenypw <- tolower(strsplit(progenyfilename, "__")[[1]][2]) ##not sure this is needed
-    
+  
     if (mode == "Data-driven: PROGENy"){
       ##Get relevant sites based on positive PROGENy scores
       cptac.progeny.pos <- cptac.progeny %>%
@@ -294,6 +293,8 @@ server <- function(input, output, session) {
         mutate(prot_site = paste0(protein, "_", site)) %>% 
         dplyr::select(symbol, protein, site, prot_site, all_of(type.val), all_of(type.pval))
     }
+    
+    
     
     cptac.phospho <- cptac.phospho %>% 
       dplyr::select(symbol, site, protein, prot_site, all_of(type.val), all_of(type.pval))
@@ -532,29 +533,7 @@ server <- function(input, output, session) {
     else if ((mode == "Manually curated")){
       print(mode)
       cptac.phospho <- read.csv("../datasets/CPTAC_phospho_tn.txt", stringsAsFactors = F, sep = "\t")
-      
-      # ## Get BioMART mapping info for Ensembl protein id to Uniprot-Swissprot, to enable data mapping between node table and CPTAC data using EnsemblProt id.
-      # ## Manually annotated ptms on pathways are annotated with Uniprot-Swissprot identifiers.
-      # ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
-      # ensemblprot_swissprot <- getBM(attributes=c('ensembl_peptide_id','hgnc_symbol','uniprotswissprot', 'ensembl_gene_id'), mart = ensembl)
-      # ensemblprot_swissprot_sub <- ensemblprot_swissprot %>%
-      #   filter(!is.na(uniprotswissprot), uniprotswissprot != "")
-      
-      # ensemblprot_swissprot_sub <- ensemblprot_swissprot_sub[, c("ensembl_peptide_id", "uniprotswissprot")]
-      # ensembl_swissprot_sub <- ensemblprot_swissprot[, c("ensembl_gene_id", "uniprotswissprot")] %>%
-      #   filter(!is.na(uniprotswissprot), uniprotswissprot != "")
-      # ensembl_swissprot_sub <- unique(ensembl_swissprot_sub)
-      
-      # ###############
-      # ## Open the relevant WP in Cytoscape. The below example uses the EGFR pathway.
-      # RCy3::commandsRun('wikipathways import-as-pathway id=WP4806') 
-      
-      # ## Get the full node table for the pathway.
-      # node.table <- RCy3::getTableColumns(table = "node")
-      ## Get the ptm nodes. This will be used later for manipulating the visual style of ptm nodes.
-      # ptm.nodes <- node.table %>%
-      #   filter(ptm == 'p')
-      
+    
       ## Add a new column, data_mapping_id, for data mapping. A new data frame is created with the new column and then read into the Cytoscape node table.
       ## The new data mapping column will contain a new id which is a composite of the parent id (Uniprot) and ptm site information, for example P27361_T202.
       ## The proteomics data has the ptm site information in a different format, i.e. S233 vs ser233.
