@@ -1,0 +1,5 @@
+"parentid"	"parentsymbol"	"position"	"WPID"
+"P28749"	"RBL1"	"thr369"	"WP4767"
+"P28749"	"RBL1"	"ser964"	"WP4767"
+"P28749"	"RBL1"	"ser975"	"WP4767"
+"P28749"	"RBL1"	"ser640"	"WP4767"

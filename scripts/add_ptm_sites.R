@@ -16,9 +16,7 @@ library(stringr)
 cytoscapePing()
 installApp("Omics Visualizer")
 
-## Define Cytoscape version variable dynamically
-cytoscapeVersion <- cytoscapeVersionInfo()[2]
-cytoscapeSampleDataPath <- paste0("/Applications/Cytoscape_v", cytoscapeVersion, "/sampleData/")
+
 
 ## Helper function: List all .txt files in a given folder.
 list_txt_files <- function(path) {

@@ -1,0 +1,2 @@
+"parentid"	"parentsymbol"	"position"	"WPID"
+"P40763"	"STAT3"	"Tyr705"	"WP5373"
