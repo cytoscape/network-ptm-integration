@@ -1,2 +1,2 @@
-"parentid"	"parentsymbol"	"position"	"WPID"
-"Q9UMX1"	"SUFU"	"lys257"	"WP4249"
+parentid	parentsymbol	position	WPID
+Q9UMX1	SUFU	lys257	WP4249

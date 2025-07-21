@@ -61,10 +61,10 @@ cptac.wp.ptm.all <- rbind(cptac.wp.ptm.all, node.table.ptm)
 file.name <- paste0(wp, '-ptm.txt')
 write.table(node.table.ptm,
             paste0(dir.path, file.name),
-            sep = "\t", row.names = FALSE)
+            sep = "\t", row.names = FALSE, quote = FALSE)
 }
 
 ## Export combined file
 write.table(cptac.wp.ptm.all, 
             paste0(dir.path, "wp-cptac-all-ptm.txt"),
-            sep = "\t", row.names = FALSE)
+            sep = "\t", row.names = FALSE, quote = FALSE)
