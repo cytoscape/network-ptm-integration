@@ -75,3 +75,5 @@ curation.nodes.suid <- merge(curation.nodes, node.table.gp.mapped, by.x ="SUB_AC
   pull()
 
 setNodeColorBypass(curation.nodes.suid, '#FF0088')
+
+############
