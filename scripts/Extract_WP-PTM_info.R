@@ -41,13 +41,11 @@ wp.cptac.ptm.all <- data.frame() ##for combined table
 for (wp in wp.cptac$wpid) {
 
 ## Open the relevant WP in Cytoscape using rWikiPathways
-openwp.cmd <- paste0('wikipathways import-as-pathway id="', wp, '"')
-RCy3::commandsRun(openwp.cmd)
+RCy3::commandsRun('wikipathways import-as-pathway id=WP4806')
 
 ## Get the full node table for the pathway
 node.table <- RCy3::getTableColumns(table = "node")
 
-## Select the ptm node info
 node.table.ptm <- node.table %>% 
   dplyr::select(parentid, parentsymbol, position) %>%
   filter(parentid != "") %>%
