@@ -12,16 +12,11 @@ library(xml2)
 
 ## Change working dir to local folder containing gpmls.
 setwd("~/Downloads/wikipathways-20250510-gpml-Homo_sapiens/")
-#setwd("~/Downloads/testinput/")
 
 ## Define output dir.
 dir.path <- "~/github/network-ptm-integration/pathways/ptm_info/"
-#dir.path <- "~/Desktop/testoutput/"
 
-#for testing
-#f <- "Hs_EGFR_tyrosine_kinase_inhibitor_resistance_WP4806_20250504.gpml"
-files <- c("Hs_DDX1_as_a_regulatory_component_of_the_Drosha_microprocessor_WP2942_20250303.gpml")
-files <- c("Hs_Zinc_homeostasis_WP3529_20240721.gpml")
+#files <- c("Hs_Melanoma_WP4685_20250303.gpml", "Hs_MAPK_signaling_WP382_20250303.gpml") ##manually defined list
 files <- list.files()
 
 ## Define combined data frame
