@@ -1,0 +1,5 @@
+parentid	parentsymbol	position	WPID
+P24941	CDK2	thr14	WP45
+P24941	CDK2	tyr15	WP45
+P06400	RB1	ser249	WP45
+P46527	CDKN1B	thr187	WP45

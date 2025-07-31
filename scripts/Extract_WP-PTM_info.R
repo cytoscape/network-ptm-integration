@@ -3,66 +3,81 @@
 ## Extract ptm info from CPTAC pathways
 
 ###############
-
 ## Setup
-if (!requireNamespace("BiocManager", quietly = TRUE)){
-  install.packages("BiocManager")}
-
-BiocManager::install("biomaRt")
-BiocManager::install("rWikiPathways")
-BiocManager::install("RCy3")
-install.packages("dplyr")
-BiocManager::install("ndexr")
-
-library(biomaRt)
-library(rWikiPathways)
-library(RCy3)
-library(dplyr)
 library(stringr)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(xml2)
 
-## Ensure Cytoscape is running and connected
-cytoscapePing()
+## Change working dir to local folder containing gpmls.
+setwd("~/Downloads/wikipathways-20250510-gpml-Homo_sapiens/")
+#setwd("~/Downloads/testinput/")
 
-## Change working dir. Adjust path based on setup.
-setwd("~/github/network-ptm-integration/scripts")
-dir.path <- "../pathways/ptm_info/"
+## Define output dir.
+dir.path <- "~/github/network-ptm-integration/pathways/ptm_info/"
+#dir.path <- "~/Desktop/testoutput/"
 
-###############
-## Read in list of pathways with manually curated ptms
-## This list was manually constructed
-wp.cptac <- read.csv("../pathways/wp-cptac-list.txt", stringsAsFactors = FALSE, sep = "\t")
-
-###############
+#for testing
+#f <- "Hs_EGFR_tyrosine_kinase_inhibitor_resistance_WP4806_20250504.gpml"
+files <- c("Hs_DDX1_as_a_regulatory_component_of_the_Drosha_microprocessor_WP2942_20250303.gpml")
+files <- c("Hs_Zinc_homeostasis_WP3529_20240721.gpml")
+files <- list.files()
 
 ## Define combined data frame
 wp.cptac.ptm.all <- data.frame() ##for combined table
 
-## Loop through pathways with manually curated ptms
-for (wp in wp.cptac$wpid) {
+for (f in files) {
+print(f)
+wpid <- str_extract(f, "WP\\d+")
+gpml <- read_xml(f)
+ns <- xml_ns(gpml)
+states <- xml_find_all(gpml, ".//d1:State", ns)
 
-## Open the relevant WP in Cytoscape using rWikiPathways
-RCy3::commandsRun('wikipathways import-as-pathway id=WP4806')
+if (length(states) > 0){
+  state_info <- map_dfr(states, function(node) {
+    comment_node <- xml_find_first(node, ".//d1:Comment", ns)
+    comment_text <- xml_text(comment_node)
 
-## Get the full node table for the pathway
-node.table <- RCy3::getTableColumns(table = "node")
+    # Skip this <State> if the comment doesn't contain 'parentid='
+    if (is.na(comment_text) || !str_detect(comment_text, "parentid=")) {
+      return(NULL)
+    }
+    
+    # Parse key=value pairs from the comment
+    kv <- str_split(comment_text, ";\\s*")[[1]]
+    kv_split <- str_split_fixed(kv, "=", 2)
+    comment_df <- as.data.frame(kv_split, stringsAsFactors = FALSE)
+    
+    colnames(comment_df) <- c("key", "value")
+    parsed <- pivot_wider(comment_df, names_from = key, values_from = value)
+    # Add GraphId and TextLabel from the <State> attributes
+    parsed$GraphId <- xml_attr(node, "GraphId")
+    parsed$TextLabel <- xml_attr(node, "TextLabel")
+   
+    parsed
+  })
 
-node.table.ptm <- node.table %>% 
-  dplyr::select(parentid, parentsymbol, position) %>%
+if ("parentid" %in% colnames(state_info)){
+state_info <- state_info %>%
   filter(parentid != "") %>%
-  distinct()  %>%
-  mutate(WPID=wp)
-  
+  select(parentid, parentsymbol, position) %>%
+  distinct() %>%
+  mutate(WPID=wpid)
+
 ## Save to combined data frame
-cptac.wp.ptm.all <- rbind(cptac.wp.ptm.all, node.table.ptm)
-  
+wp.cptac.ptm.all <- rbind(wp.cptac.ptm.all, state_info)
+
 ## Export individual files
-file.name <- paste0(wp, '-ptm.txt')
-write.table(node.table.ptm,
+file.name <- paste0(wpid, '-ptm.txt')
+write.table(state_info,
             paste0(dir.path, file.name),
             sep = "\t", row.names = FALSE, quote = FALSE)
 }
+}
+}
 
 ## Export combined file
-write.table(cptac.wp.ptm.all, 
+write.table(wp.cptac.ptm.all, 
             paste0(dir.path, "wp-cptac-all-ptm.txt"),
             sep = "\t", row.names = FALSE, quote = FALSE)
