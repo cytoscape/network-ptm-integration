@@ -61,7 +61,7 @@ state_info <- state_info %>%
   mutate(WPID=wpid)
 
 ## Save to combined data frame
-wp.cptac.ptm.all <- rbind(wp.cptac.ptm.all, state_info)
+#wp.cptac.ptm.all <- rbind(wp.cptac.ptm.all, state_info)
 
 ## Export individual files
 file.name <- paste0(wpid, '-ptm.txt')

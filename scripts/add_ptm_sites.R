@@ -207,7 +207,8 @@ ui <- navbarPage(
                selectInput("analysisMode", "Analysis Mode:",
                            choices = c("all", "kinase")),
                br(),
-               actionButton("run", "Run Analysis")
+               actionButton("run", "Run Analysis"),
+               textOutput("status")
              ),
              mainPanel(
                h4("Status"),
@@ -251,13 +252,13 @@ server <- function(input, output, session) {
     analysisMode <- input$analysisMode     # "all" or "kinase"
     mode <- input$phosphoMode  #which phospho mode
     
-    ##This doesn't work, it is displayed AFTER completed analysis
-    output$status <- renderText({
-      paste("Starting analysis with WikiPathway ID:", wpid, 
-            "\nPhospho Mode:", mode,
-            "\nVisualization Mode:", vizMode, 
-            "\nAnalysis Mode:", analysisMode)
-    })
+    # #This doesn't work, it is displayed AFTER completed analysis
+    # output$status <- renderText({
+    #   paste("Starting analysis with WikiPathway ID:", wpid,
+    #         "\nPhospho Mode:", mode,
+    #         "\nVisualization Mode:", vizMode,
+    #         "\nAnalysis Mode:", analysisMode)
+    # })
     
     # #this doesn't work
     # observeEvent({
@@ -291,8 +292,6 @@ server <- function(input, output, session) {
         mutate(prot_site = paste0(protein, "_", site)) %>% 
         dplyr::select(symbol, protein, site, prot_site, all_of(type.val), all_of(type.pval))
     }
-    
-    
     
     cptac.phospho <- cptac.phospho %>% 
       dplyr::select(symbol, site, protein, prot_site, all_of(type.val), all_of(type.pval))
@@ -523,7 +522,7 @@ server <- function(input, output, session) {
     } ##end if non-zero ptms
     else {
       output$status <- renderText({
-        paste("There are no no matching phospho sites.")
+        "There are no no matching phospho sites."
       })
     }
     } ## end if data-driven
