@@ -4,6 +4,7 @@ if (!require("BiocManager", quietly = TRUE))
 BiocManager::install("RCy3")
 # Load required libraries
 library(shiny)
+#library(shinyjs)
 library(shinythemes)
 library(RCy3)
 library(dplyr)
@@ -16,7 +17,9 @@ library(stringr)
 cytoscapePing()
 installApp("Omics Visualizer")
 
-
+## Define Cytoscape version variable dynamically
+cytoscapeVersion <- cytoscapeVersionInfo()[2]
+cytoscapeSampleDataPath <- paste0("/Applications/Cytoscape_v", cytoscapeVersion, "/sampleData/")
 
 ## Helper function: List all .txt files in a given folder.
 list_txt_files <- function(path) {
@@ -27,7 +30,8 @@ list_txt_files <- function(path) {
 
 ## Dynamically generate file choices:
 # For the datasets folder (all .txt files)
-datasetsChoices <- list_txt_files("../datasets")
+phosphodatasetsChoices <- list_txt_files("../datasets/phospho")
+proteindatasetsChoices <- list_txt_files("../datasets/protein")
 # For the PROGENy subfolder (all .txt files)
 progenyChoices  <- list_txt_files("../datasets/PROGENy")
 # For the CPTAC cancer type
@@ -47,6 +51,7 @@ ui <- navbarPage(
   
   ## Tab 1: Data File Selection
   tabPanel("Data Files",
+           useShinyjs(),
            sidebarLayout(
              sidebarPanel(
                h4("Select Method for Adding Phospho sites"),
@@ -54,11 +59,11 @@ ui <- navbarPage(
                            choices = c("Data-driven: PROGENy", "Data-driven: phosphoproteomics data", "Manually curated")),
                h4("Select Data Files"),
                selectInput("phosphoFile", "Phosphoproteomics Data File:",
-                           choices = datasetsChoices,
-                           selected = names(datasetsChoices)[grep("phospho", names(datasetsChoices), ignore.case = TRUE)[1]]),
+                           choices = phosphodatasetsChoices,
+                           selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
                selectInput("proteinFile", "Proteomics Data File:",
-                           choices = datasetsChoices,
-                           selected = names(datasetsChoices)[grep("protein", names(datasetsChoices), ignore.case = TRUE)[1]]),
+                           choices = proteindatasetsChoices,
+                           selected = names(proteindatasetsChoices)[grep("protein", names(proteindatasetsChoices), ignore.case = TRUE)[1]]),
                selectInput("progenyFile", "PROGENy Data File:",
                            choices = progenyChoices,
                            selected = names(progenyChoices)[1]),
@@ -83,6 +88,7 @@ ui <- navbarPage(
   
   ## Tab 2: Analysis Controls & Output
   tabPanel("Analysis",
+           useShinyjs(),
            sidebarLayout(
              sidebarPanel(
                h4("Analysis Parameters"),
@@ -258,13 +264,6 @@ server <- function(input, output, session) {
     #         "\nPhospho Mode:", mode,
     #         "\nVisualization Mode:", vizMode,
     #         "\nAnalysis Mode:", analysisMode)
-    # })
-    
-    # #this doesn't work
-    # observeEvent({
-    #   if (input$phosphoMode == "Manually curated") {
-    #     hide(input$progenyFile)
-    #   }
     # })
 
     ## -----------------------
@@ -522,7 +521,7 @@ server <- function(input, output, session) {
     } ##end if non-zero ptms
     else {
       output$status <- renderText({
-        "There are no no matching phospho sites."
+        "There are no matching phospho sites."
       })
     }
     } ## end if data-driven
