@@ -362,7 +362,7 @@ server <- function(input, output, session) {
     ## For kinase mode, filter for only those phospho sites that have kinases on the pathway
     if (analysisMode == "kinase") {
       psp.data.human <- psp.data %>%
-        filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") %>% 
+        filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human" & IN_VIVO_RXN == "X") %>% 
         dplyr::select(GENE, KINASE, KIN_ACC_ID, SUB_ACC_ID, SUB_MOD_RSD)
       
       ## Data mapping PSP data

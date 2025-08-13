@@ -12,7 +12,6 @@ BiocManager::install("biomaRt")
 BiocManager::install("rWikiPathways")
 BiocManager::install("RCy3")
 install.packages("dplyr")
-BiocManager::install("ndexr")
 
 library(biomaRt)
 library(rWikiPathways)
@@ -39,16 +38,14 @@ biomart <- read.csv("../annotations/mapping/ensembl_mappings.txt", stringsAsFact
   distinct()
 
 psp.data.human <- psp.data %>%
-  filter(KIN_ORGANISM == "human" & IN_VIVO_RXN == "X") %>% 
-  dplyr::select(GENE, KINASE, KIN_ACC_ID, SUB_ACC_ID, SUB_MOD_RSD)
+  filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human" & IN_VIVO_RXN == "X") %>%
+  dplyr::select(GENE, KINASE, KIN_ACC_ID, SUBSTRATE, SUB_ACC_ID, SUB_GENE_ID, SUB_MOD_RSD)
 
-## Data mapping PSP data
-psp.data.human.mapped <- merge(psp.data.human, biomart, by.x = "KIN_ACC_ID", by.y = "uniprotswissprot") %>%
-  mutate(kinase_ensembl_id = ensembl_gene_id) %>%
-  mutate(prot_site = paste0(ensembl_peptide_id, "_", SUB_MOD_RSD)) %>%
-  dplyr::select(GENE, KINASE, KIN_ACC_ID, kinase_ensembl_id, SUB_ACC_ID, ensembl_peptide_id, prot_site, SUB_MOD_RSD)
+psp.data.human.full <- psp.data %>%
+ filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human")
 
 ## Open the relevant WP in Cytoscape using rWikiPathways
+wp = "WP4223"
 openwp.cmd <- paste0('wikipathways import-as-pathway id="', wp, '"')
 RCy3::commandsRun(openwp.cmd)
 
@@ -63,17 +60,16 @@ node.table.gp <- node.table %>%
 ## Map the node table to uniprot
 node.table.gp.mapped <- merge(node.table.gp, biomart, by.x ="Ensembl", by.y = "ensembl_gene_id")
 
-## Get list of proteins on the pathway with ptms according to PSP data, and filter for those with kinases in the pathway
 curation.nodes <- psp.data.human %>% 
   filter (SUB_ACC_ID %in% node.table.gp.mapped$uniprotswissprot) %>%
-  filter (KIN_ACC_ID %in% node.table.gp.mapped$uniprotswissprot) %>%
-  dplyr::select(SUB_ACC_ID) %>%
-  distinct()
+  filter (KIN_ACC_ID %in% node.table.gp.mapped$uniprotswissprot)
 
 curation.nodes.suid <- merge(curation.nodes, node.table.gp.mapped, by.x ="SUB_ACC_ID", by.y ="uniprotswissprot") %>%
   dplyr::select(SUID) %>% 
   pull()
 
 setNodeColorBypass(curation.nodes.suid, '#FF0088')
+
+print(curation.nodes)
 
 ############
