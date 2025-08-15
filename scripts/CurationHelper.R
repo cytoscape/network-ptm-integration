@@ -39,7 +39,13 @@ biomart <- read.csv("../annotations/mapping/ensembl_mappings.txt", stringsAsFact
 
 psp.data.human <- psp.data %>%
   filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human" & IN_VIVO_RXN == "X") %>%
-  dplyr::select(GENE, KINASE, KIN_ACC_ID, SUBSTRATE, SUB_ACC_ID, SUB_GENE_ID, SUB_MOD_RSD)
+  dplyr::select(GENE, KINASE, KIN_ACC_ID, SUBSTRATE, SUB_ACC_ID, SUB_GENE_ID, SUB_GENE, SUB_MOD_RSD, SITE_...7_AA) %>%
+  mutate(SUB_MOD_RSD_2 = case_when(
+    str_starts(SUB_MOD_RSD, "S") ~ str_replace(SUB_MOD_RSD, "^S", "ser"),
+    str_starts(SUB_MOD_RSD, "T") ~ str_replace(SUB_MOD_RSD, "^T", "thr"),
+    str_starts(SUB_MOD_RSD, "Y") ~ str_replace(SUB_MOD_RSD, "^Y", "tyr"),
+    TRUE ~ SUB_MOD_RSD  # leave unchanged if it doesn't match S/T/Y
+  ))
 
 psp.data.human.full <- psp.data %>%
  filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human")
@@ -62,14 +68,18 @@ node.table.gp.mapped <- merge(node.table.gp, biomart, by.x ="Ensembl", by.y = "e
 
 curation.nodes <- psp.data.human %>% 
   filter (SUB_ACC_ID %in% node.table.gp.mapped$uniprotswissprot) %>%
-  filter (KIN_ACC_ID %in% node.table.gp.mapped$uniprotswissprot)
+  filter (KIN_ACC_ID %in% node.table.gp.mapped$uniprotswissprot) %>%
+  mutate (comment = paste0("parentid=",SUB_ACC_ID,"; parentsymbol=",SUBSTRATE,"; site=",SITE_...7_AA,"; position=",
+                           SUB_MOD_RSD_2,"; ptm=p; direction="))
 
 curation.nodes.suid <- merge(curation.nodes, node.table.gp.mapped, by.x ="SUB_ACC_ID", by.y ="uniprotswissprot") %>%
   dplyr::select(SUID) %>% 
   pull()
 
+parentid=P19174; parentsymbol=PLCG1; site=EGRNPGFyVEANPMP; position=tyr783; sitegrpid=447667; ptm=p; direction=u
+
 setNodeColorBypass(curation.nodes.suid, '#FF0088')
 
-print(curation.nodes)
+#print(curation.nodes)
 
 ############

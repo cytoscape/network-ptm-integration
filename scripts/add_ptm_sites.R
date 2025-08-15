@@ -4,7 +4,7 @@ if (!require("BiocManager", quietly = TRUE))
 BiocManager::install("RCy3")
 # Load required libraries
 library(shiny)
-#library(shinyjs)
+library(shinyjs)
 library(shinythemes)
 library(RCy3)
 library(dplyr)
@@ -52,6 +52,13 @@ ui <- navbarPage(
   ## Tab 1: Data File Selection
   tabPanel("Data Files",
            useShinyjs(),
+           wellPanel(
+             h4("Network - PTM Integration"),
+             p("This tool allows you to add ptm information to Cytoscape networks, and visualize data on ptms and parent nodes."),
+             p("Ptms can be data-driven (phosphoproteomics data, PROGENy data), or manually curated ptms in WikiPathways models can be used directly for data visualization. 
+             The tool comes with pre-loaded example data (CPTAC pan-cancer phosphoproteomics and proteomics data, PROGENy pathway activity data). If you want to use your own data, 
+               add them to the datasets/phospho and datasets/protein directories respectively. Required data columns are a value and p value, with required column header suffix '.val' and '.pval'.")
+           ),
            sidebarLayout(
              sidebarPanel(
                h4("Select Method for Adding Phospho sites"),
