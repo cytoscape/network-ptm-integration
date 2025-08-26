@@ -29,10 +29,10 @@ dir.path <- "../pathways/ptm_info/"
 ###############
 
 ## Read in PSP data
-psp.data <- read.csv("../annotations/kinase/Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
+psp.data <- read.csv("../annotations/kinase-substrate/PSP_Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
 
 ## Read in local BioMART file
-biomart <- read.csv("../annotations/mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t") %>%
+biomart <- read.csv("../annotations/id-mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t") %>%
   dplyr::select(ensembl_gene_id,uniprotswissprot) %>% 
   filter(uniprotswissprot != "") %>%
   distinct()
@@ -51,7 +51,7 @@ psp.data.human.full <- psp.data %>%
  filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human")
 
 ## Open the relevant WP in Cytoscape using rWikiPathways
-wp = "WP179"
+wp = "WP4806"
 openwp.cmd <- paste0('wikipathways import-as-pathway id="', wp, '"')
 RCy3::commandsRun(openwp.cmd)
 
@@ -79,7 +79,7 @@ curation.nodes.suid <- merge(curation.nodes, node.table.gp.mapped, by.x ="SUB_AC
 setNodeColorBypass(curation.nodes.suid, '#FF7799')
 
 ## Manually enter a substrate to print only those rows
-substrate = "RBL2"
+substrate = "CCND1"
 substrate_subset <- curation.nodes %>%
   filter(SUB_GENE == substrate) %>%
   select(GENE, SUB_GENE, SUB_MOD_RSD_2, comment)

@@ -37,9 +37,9 @@ progenyChoices  <- list_txt_files("../datasets/PROGENy")
 # For the CPTAC cancer type
 cptacChoices <- c("CCRCC", "COAD", "HNSCC", "LSCC", "LUAD", "OV", "PDAC", "UCEC")
 # For the kinase-substrate mapping folder (all .txt files)
-kinasemappingChoices <- list_txt_files("../annotations/kinase")
+kinasemappingChoices <- list_txt_files("../annotations/kinase-substrate")
 # For the identifier mapping folder (all .txt files)
-identifiermappingChoices <- list_txt_files("../annotations/mapping")
+identifiermappingChoices <- list_txt_files("../annotations/id-mapping")
 
 ## -----------------------
 ## Shiny UI
@@ -54,10 +54,9 @@ ui <- navbarPage(
            useShinyjs(),
            wellPanel(
              h4("Network - PTM Integration"),
-             p("This tool allows you to add ptm information to Cytoscape networks, and visualize data on ptms and parent nodes."),
-             p("Ptms can be data-driven (phosphoproteomics data, PROGENy data), or manually curated ptms in WikiPathways models can be used directly for data visualization. 
-             The tool comes with pre-loaded example data (CPTAC pan-cancer phosphoproteomics and proteomics data, PROGENy pathway activity data). If you want to use your own data, 
-               add them to the datasets/phospho and datasets/protein directories respectively. Required data columns are a value and p value, with required column header suffix '.val' and '.pval'.")
+             p("This tool allows you to add ptms to Cytoscape networks, and visualize data on ptms and parent nodes."),
+             p("Ptms can be added based on data (phosphoproteomics data, PROGENy data), or manually curated ptms in WikiPathways models can be used directly for data visualization. 
+             The tool comes with pre-loaded example data (CPTAC pan-cancer phosphoproteomics and proteomics data, PROGENy pathway activity data).")
            ),
            sidebarLayout(
              sidebarPanel(
@@ -331,6 +330,7 @@ server <- function(input, output, session) {
     node.table.prot <- node.table %>% 
       filter(Type %in% c("Protein", "GeneProduct")) %>%
         dplyr::select(SUID, name, XrefId, Ensembl)
+    
     node.table.prot.mapped <- merge(node.table.prot, biomart, by.x = "Ensembl", by.y = "ensembl_gene_id") %>%
       filter(ensembl_peptide_id != "") %>%
       filter(uniprotswissprot != "")
@@ -341,6 +341,7 @@ server <- function(input, output, session) {
     matching.nodes.phospho <- cptac.progeny.pos %>%
       filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
       dplyr::select(symbol, protein, site, prot_site)
+
     }
     
     if (mode == "Data-driven: phosphoproteomics data"){
@@ -348,7 +349,7 @@ server <- function(input, output, session) {
       matching.nodes.phospho <- cptac.phospho.threshold %>%
         filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
         dplyr::select(symbol, protein, site, prot_site)
-    }
+      }
     
     ## Get node positions for all protein nodes
     node.positions <- getNodePosition(node.names = node.table.prot$SUID)
@@ -369,20 +370,27 @@ server <- function(input, output, session) {
     ## For kinase mode, filter for only those phospho sites that have kinases on the pathway
     if (analysisMode == "kinase") {
       psp.data.human <- psp.data %>%
-        filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human" & IN_VIVO_RXN == "X") %>% 
+        filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human") %>% 
         dplyr::select(GENE, KINASE, KIN_ACC_ID, SUB_ACC_ID, SUB_MOD_RSD)
       
       ## Data mapping PSP data
-      psp.data.human.mapped <- merge(psp.data.human, biomart, by.x = "KIN_ACC_ID", by.y = "uniprotswissprot") %>%
-        mutate(kinase_ensembl_id = ensembl_gene_id) %>%
-        mutate(prot_site = paste0(ensembl_peptide_id, "_", SUB_MOD_RSD)) %>%
-        dplyr::select(GENE, KINASE, KIN_ACC_ID, kinase_ensembl_id, SUB_ACC_ID, ensembl_peptide_id, prot_site, SUB_MOD_RSD)
-
+      ## Add Ensembl prot id for substrate
+      psp.data.human.mapped <- merge(psp.data.human, biomart, by.x = "SUB_ACC_ID", by.y = "uniprotswissprot") %>%
+        mutate(substrate_ensembl_gene_id = ensembl_gene_id) %>%
+        mutate(substrate_peptide_id = ensembl_peptide_id) %>%
+        mutate(prot_site = paste0(substrate_peptide_id, "_", SUB_MOD_RSD)) %>%
+        dplyr::select(GENE, KINASE, KIN_ACC_ID, substrate_ensembl_gene_id, SUB_ACC_ID, substrate_peptide_id, prot_site, SUB_MOD_RSD)
+      
+      ## Add Ensembl gene id for kinase
+      psp.data.human.mapped <- merge(psp.data.human.mapped, biomart, by.x = "KIN_ACC_ID", by.y = "uniprotswissprot") %>%
+        mutate(kin_ensembl_gene_id = ensembl_gene_id)
+      
       ## Get filtered list of phospho sites by filtering for those with kinases on the pw.
       filtered.ptms <- psp.data.human.mapped %>%
-        filter (prot_site %in% matching.nodes.phospho$prot_site) %>%
-        filter (kinase_ensembl_id %in% node.table.prot$Ensembl) %>%
-        dplyr::select (prot_site)
+        filter(prot_site %in% matching.nodes.phospho$prot_site) %>%
+        filter(kin_ensembl_gene_id %in% node.table.prot$Ensembl) %>%
+        dplyr::select(prot_site)
+      
       filtered.ptms <- unique(filtered.ptms)
     
       matching.nodes.phospho <- matching.nodes.phospho %>%
@@ -470,16 +478,29 @@ server <- function(input, output, session) {
       node.layout.pie <- node.layout.pie %>%
         mutate(x.ptm = (x_location + node.width / 2 + 20)) %>%
         mutate(y.ptm = y_location)
-      cptac.phospho.full.ov <- cptac.phospho %>%
-        filter(prot_site %in% cptac.progeny.pos$prot_site) %>%
+      
+      
+      
+      cptac.phospho.full.ov <- matching.nodes.phospho %>%
         mutate(symbol_ptm = paste0(symbol, "_ptm"))
+      
+      # cptac.phospho.full.ov <- cptac.phospho %>%
+      #   filter(prot_site %in% cptac.progeny.pos$prot_site) %>%
+      #   mutate(symbol_ptm = paste0(symbol, "_ptm"))
+      
       write.table(cptac.phospho.full.ov, 
                   paste0(cytoscapeSampleDataPath, "cptac.phospho.full.txt"),
                   sep = "\t", row.names = FALSE)
+      # matching.nodes.prot.pie <- node.table.prot.mapped %>% 
+      #   filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>% 
+      #   mutate(name = paste0(name, "_ptm")) %>% 
+      #   dplyr::select(SUID, name)
+      
       matching.nodes.prot.pie <- node.table.prot.mapped %>% 
-        filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>% 
+        # filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>% 
         mutate(name = paste0(name, "_ptm")) %>% 
         dplyr::select(SUID, name)
+      
       for (p in matching.nodes.prot.pie$SUID) {
         ptm.name <- matching.nodes.prot.pie$name[matching.nodes.prot.pie$SUID == p]
         suid.list <- addCyNodes(node.names = ptm.name, skip.duplicate.names = FALSE)
@@ -535,7 +556,7 @@ server <- function(input, output, session) {
     
     else if ((mode == "Manually curated")){
       print(mode)
-      cptac.phospho <- read.csv("../datasets/CPTAC_phospho_tn.txt", stringsAsFactors = F, sep = "\t")
+      cptac.phospho <- read.csv("../datasets/phospho/CPTAC_phospho_tn.txt", stringsAsFactors = F, sep = "\t")
     
       ## Add a new column, data_mapping_id, for data mapping. A new data frame is created with the new column and then read into the Cytoscape node table.
       ## The new data mapping column will contain a new id which is a composite of the parent id (Uniprot) and ptm site information, for example P27361_T202.

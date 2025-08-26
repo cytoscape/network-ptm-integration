@@ -35,7 +35,7 @@ cytoscapeSampleDataPath <- paste0("/Applications/Cytoscape_v", cytoscapeVersion,
 ## Read in data file
 
 ## Read in local BioMART file
-biomart <- read.csv("../annotations/mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t") %>%
+biomart <- read.csv("../annotations/id-mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t") %>%
   dplyr::select(ensembl_gene_id,ensembl_peptide_id)
 
 ## CPTAC site summary data
