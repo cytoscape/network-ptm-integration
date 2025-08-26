@@ -45,24 +45,24 @@ identifiermappingChoices <- list_txt_files("../annotations/id-mapping")
 ## Shiny UI
 ## -----------------------
 ui <- navbarPage(
-  "Network PTM Integration",
+  "Phosphosite - Pathway Integration",
   id = "mainTabs",                      # ID to allow tab switching
-  theme = shinytheme("united"),         # Orange-inspired theme
+  theme = shinytheme("cerulean"),         # Orange-inspired theme
   
   ## Tab 1: Data File Selection
   tabPanel("Data Files",
            useShinyjs(),
            wellPanel(
-             h4("Network - PTM Integration"),
-             p("This tool allows you to add ptms to Cytoscape networks, and visualize data on ptms and parent nodes."),
-             p("Ptms can be added based on data (phosphoproteomics data, PROGENy data), or manually curated ptms in WikiPathways models can be used directly for data visualization. 
-             The tool comes with pre-loaded example data (CPTAC pan-cancer phosphoproteomics and proteomics data, PROGENy pathway activity data).")
+             h3("Phosphosite - Pathway Integration"),
+             p("This tool allows you to add phosphorylation sites to proteins in WikiPathways models in Cytoscape, and to visualize data on ptms and parent nodes."),
+             p("Phosphosites can be added from data (phosphoproteomics data, PROGENy data), or manually curated phosphosites already present in WikiPathways models can be used directly for data visualization. 
+             The tool includes pre-loaded example data (CPTAC pan-cancer phosphoproteomics and proteomics data, PROGENy pathway activity data).")
            ),
            sidebarLayout(
              sidebarPanel(
-               h4("Select Method for Adding Phospho sites"),
-               selectInput("phosphoMode", "Phosphosite Mode:",
-                           choices = c("Data-driven: PROGENy", "Data-driven: phosphoproteomics data", "Manually curated")),
+               h4("Select Method for Adding Phospho Sites"),
+               selectInput("phosphoMode", "Phospho Site Mode:",
+                           choices = c("Data-driven PROGENy", "Data-driven phosphoproteomics data", "Manually curated")),
                h4("Select Data Files"),
                selectInput("phosphoFile", "Phosphoproteomics Data File:",
                            choices = phosphodatasetsChoices,
@@ -76,18 +76,18 @@ ui <- navbarPage(
                selectInput("cptacType", "CPTAC Cancer Type:",
                            choices = cptacChoices,
                            selected = names(cptacChoices)[1]),
-               selectInput("kinaseFile", "Kinase-Substrate Mapping File:",
-                           choices = kinasemappingChoices,
-                           selected = names(kinasemappingChoices)[grep("Kinase", names(kinasemappingChoices), ignore.case = TRUE)[1]]),
-               selectInput("biomartFile", "Identifier Mapping File:",
-                           choices = identifiermappingChoices,
-                           selected = names(identifiermappingChoices)[grep("mart", names(identifiermappingChoices), ignore.case = TRUE)[1]]),
+               # selectInput("kinaseFile", "Kinase-Substrate Mapping File:",
+               #             choices = kinasemappingChoices,
+               #             selected = names(kinasemappingChoices)[grep("Kinase", names(kinasemappingChoices), ignore.case = TRUE)[1]]),
+               # selectInput("biomartFile", "Identifier Mapping File:",
+               #             choices = identifiermappingChoices,
+               #             selected = names(identifiermappingChoices)[grep("mart", names(identifiermappingChoices), ignore.case = TRUE)[1]]),
                br(),
                actionButton("goToAnalysis", "Proceed to Analysis")
              ),
              mainPanel(
-               h4("Current File Selections"),
-               verbatimTextOutput("selectedFiles")
+               h4("Current Selections"),
+               uiOutput("selectedFiles")
              )
            )
   ),
@@ -236,15 +236,16 @@ ui <- navbarPage(
 server <- function(input, output, session) {
   
   ## Display selected file names in the "Data Files" tab.
-  output$selectedFiles <- renderPrint({
-    list(
-      Mode = input$phosphoMode,
-      Phospho = input$phosphoFile,
-      Protein = input$proteinFile,
-      PROGENy = input$progenyFile,
-      CPTAC_Cancer_Type = input$cptacType,
-      Kinase_Substrate = input$kinaseFile,
-      BioMart = input$biomartFile
+  
+  output$selectedFiles <- renderUI({
+    tags$ul(style = "list-style-type: none; padding-left: 0;",
+            tags$li(style="margin-bottom: 8px;", tags$b("Mode:"), input$phosphoMode),
+            tags$li(style="margin-bottom: 8px;", tags$b("Phospho:"), input$phosphoFile),
+            tags$li(style="margin-bottom: 8px;", tags$b("Protein:"), input$proteinFile),
+            tags$li(style="margin-bottom: 8px;", tags$b("PROGENy:"), input$progenyFile),
+            tags$li(style="margin-bottom: 8px;", tags$b("CPTAC Cancer Type:"), input$cptacType)
+            # tags$li(style="margin-bottom: 8px;", tags$b("Kinase Substrate:"), input$kinaseFile),
+            # tags$li(style="margin-bottom: 8px;", tags$b("BioMart:"), input$biomartFile)
     )
   })
   
@@ -275,13 +276,18 @@ server <- function(input, output, session) {
     ## -----------------------
     ## Import Files Based on User Selection
     ## -----------------------
+    
+    ##Import id mapping file from Biomart and kinase-substrate mapping from PSP
+    psp.data <- read.csv("../annotations/kinase-substrate/PSP_Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
+    biomart <- read.csv("../annotations/id-mapping/", stringsAsFactors = FALSE, sep = "\t")
+
     cptac.phospho <- read.csv(input$phosphoFile, stringsAsFactors = FALSE, sep = "\t") %>% 
       mutate(prot_site = paste0(protein, "_", site))
     
     cptac.protein <- read.csv(input$proteinFile, stringsAsFactors = FALSE, sep = "\t")
     cptac.progeny <- read.csv(input$progenyFile, stringsAsFactors = FALSE, sep = "\t")
-    psp.data <- read.csv(input$kinaseFile, stringsAsFactors = FALSE, sep = "\t")
-    biomart <- read.csv(input$biomartFile, stringsAsFactors = FALSE, sep = "\t")
+    # psp.data <- read.csv(input$kinaseFile, stringsAsFactors = FALSE, sep = "\t")
+    # biomart <- read.csv(input$biomartFile, stringsAsFactors = FALSE, sep = "\t")
     
     ## -----------------------
     ## Preprocess Data from Datasets
@@ -290,7 +296,7 @@ server <- function(input, output, session) {
     type.pval <- paste0(input$cptacType, ".pval") ##get relevant column header based on cancer type selected
     type.val <- paste0(input$cptacType, ".val")
   
-    if (mode == "Data-driven: PROGENy"){
+    if (mode == "Data-driven PROGENy"){
       ##Get relevant sites based on positive PROGENy scores
       cptac.progeny.pos <- cptac.progeny %>%
         filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05) %>%
@@ -304,7 +310,7 @@ server <- function(input, output, session) {
       dplyr::select(ensembl, symbol, all_of(type.val), all_of(type.pval)) %>%
       filter(!is.na(.data[[type.pval]]) & !is.na(.data[[type.pval]]))
     
-    if (mode == "Data-driven: phosphoproteomics data"){
+    if (mode == "Data-driven phosphoproteomics data"){
       cptac.phospho.threshold <- cptac.phospho %>%
         filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05)
     }
@@ -318,7 +324,7 @@ server <- function(input, output, session) {
     ## Get nodes in the pathway, specifically protein nodes, and map them to Ensembl protein ids
     node.table <- RCy3::getTableColumns(table = "node")
     
-    if (mode %in% c("Data-driven: PROGENy", "Data-driven: phosphoproteomics data")) {
+    if (mode %in% c("Data-driven PROGENy", "Data-driven phosphoproteomics data")) {
       # Remove existing PTM nodes (nodes labeled "p").
       selectNodes(nodes = "p", by.col = "name", preserve.current.selection = FALSE) 
       deleteSelectedNodes()
@@ -335,7 +341,7 @@ server <- function(input, output, session) {
       filter(ensembl_peptide_id != "") %>%
       filter(uniprotswissprot != "")
     
-    if (mode == "Data-driven: PROGENy"){
+    if (mode == "Data-driven PROGENy"){
       print(mode)
     ## Get the relevant phospho sites from PROGENy that match the proteins in the node table
     matching.nodes.phospho <- cptac.progeny.pos %>%
@@ -344,7 +350,7 @@ server <- function(input, output, session) {
 
     }
     
-    if (mode == "Data-driven: phosphoproteomics data"){
+    if (mode == "Data-driven phosphoproteomics data"){
       print(mode)
       matching.nodes.phospho <- cptac.phospho.threshold %>%
         filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
