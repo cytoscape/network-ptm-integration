@@ -34,11 +34,12 @@ setwd("~/github/network-ptm-integration/scripts")
 
 ## Phosphoproteomics data from CPTAC, for multiple cancer types.
 ## The "pval" and "val" statistics are from Wilcoxon rank sum test. Positive values means abundance is higher in tumor.
-cptac.phospho <- read.csv("../datasets/CPTAC_phospho_tn.txt", stringsAsFactors = F, sep = "\t")
+cptac.phospho <- read.csv("../datasets/phospho/CPTAC_phospho_tn.txt", stringsAsFactors = F, sep = "\t")
 
 ## Proteomics data from CPTAC, for multiple cancer types.
 ## The "pval" and "val" statistics are from Wilcoxon rank sum test. Positive values means abundance is higher in tumor.
-cptac.protein <- read.csv("../datasets/CPTAC_protein_tn.txt", stringsAsFactors = F, sep = "\t")
+
+cptac.protein <- read.csv("../datasets/protein/CPTAC_protein_tn.txt", stringsAsFactors = FALSE, sep = "\t")
 
 ## Get BioMART mapping info for Ensembl protein id to Uniprot-Swissprot, to enable data mapping between node table and CPTAC data using EnsemblProt id.
 ## Manually annotated ptms on pathways are annotated with Uniprot-Swissprot identifiers.

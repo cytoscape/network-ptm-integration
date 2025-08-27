@@ -257,7 +257,7 @@ server <- function(input, output, session) {
   observeEvent(input$run, {
     req(input$wpid, input$vizMode, input$analysisMode, input$phosphoMode,
         input$phosphoFile, input$proteinFile, input$progenyFile,
-        input$cptacType, input$kinaseFile, input$biomartFile)
+        input$cptacType)
     
     # Retrieve user selections
     wpid         <- input$wpid
@@ -279,7 +279,7 @@ server <- function(input, output, session) {
     
     ##Import id mapping file from Biomart and kinase-substrate mapping from PSP
     psp.data <- read.csv("../annotations/kinase-substrate/PSP_Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
-    biomart <- read.csv("../annotations/id-mapping/", stringsAsFactors = FALSE, sep = "\t")
+    biomart <- read.csv("../annotations/id-mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t")
 
     cptac.phospho <- read.csv(input$phosphoFile, stringsAsFactors = FALSE, sep = "\t") %>% 
       mutate(prot_site = paste0(protein, "_", site))
@@ -480,33 +480,32 @@ server <- function(input, output, session) {
       output$status <- renderText({
         paste("Traditional PTM visualization complete for WikiPathway", wpid)
       })
-    } else if (vizMode == "Pie Chart") {
+     } 
+    else if (vizMode == "Pie Chart") {
       node.layout.pie <- node.layout.pie %>%
         mutate(x.ptm = (x_location + node.width / 2 + 20)) %>%
         mutate(y.ptm = y_location)
-      
-      
-      
-      cptac.phospho.full.ov <- matching.nodes.phospho %>%
-        mutate(symbol_ptm = paste0(symbol, "_ptm"))
-      
-      # cptac.phospho.full.ov <- cptac.phospho %>%
-      #   filter(prot_site %in% cptac.progeny.pos$prot_site) %>%
+
+      # cptac.phospho.full.ov <- matching.nodes.phospho %>%
       #   mutate(symbol_ptm = paste0(symbol, "_ptm"))
-      
-      write.table(cptac.phospho.full.ov, 
+      #
+      cptac.phospho.full.ov <- cptac.phospho %>%
+        filter(prot_site %in% cptac.progeny.pos$prot_site) %>%
+        mutate(symbol_ptm = paste0(symbol, "_ptm"))
+
+      write.table(cptac.phospho.full.ov,
                   paste0(cytoscapeSampleDataPath, "cptac.phospho.full.txt"),
                   sep = "\t", row.names = FALSE)
-      # matching.nodes.prot.pie <- node.table.prot.mapped %>% 
-      #   filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>% 
-      #   mutate(name = paste0(name, "_ptm")) %>% 
-      #   dplyr::select(SUID, name)
-      
-      matching.nodes.prot.pie <- node.table.prot.mapped %>% 
-        # filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>% 
-        mutate(name = paste0(name, "_ptm")) %>% 
+      matching.nodes.prot.pie <- node.table.prot.mapped %>%
+        filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>%
+        mutate(name = paste0(name, "_ptm")) %>%
         dplyr::select(SUID, name)
-      
+
+      # matching.nodes.prot.pie <- node.table.prot.mapped %>%
+      #   # filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>%
+      #   mutate(name = paste0(name, "_ptm")) %>%
+      #   dplyr::select(SUID, name)
+
       for (p in matching.nodes.prot.pie$SUID) {
         ptm.name <- matching.nodes.prot.pie$name[matching.nodes.prot.pie$SUID == p]
         suid.list <- addCyNodes(node.names = ptm.name, skip.duplicate.names = FALSE)
@@ -518,35 +517,35 @@ server <- function(input, output, session) {
         setNodeHeightBypass(node.names = suid.ptm, 40)
       }
       ovload.cmd <- paste('ov load',
-                          'dataTypeList="string,string,string,string,double,double,string"', 
+                          'dataTypeList="string,string,string,string,double,double,string"',
                           paste0('file="', cytoscapeSampleDataPath, "cptac.phospho.full.txt\""),
-                          'newTableName="cptac.phospho.full"', 
+                          'newTableName="cptac.phospho.full"',
                           'startLoadRow="2"')
       commandsRun(ovload.cmd)
       ovconnect.cmd <- paste('ov connect',
-                             'mappingColNet="shared name"', 
+                             'mappingColNet="shared name"',
                              'mappingColTable="symbol_ptm"')
       commandsRun(ovconnect.cmd)
       ovviz.cmd <- paste('ov viz apply inner continuous',
-                         paste0('attributes="', type.val, '"'), 
-                         'paletteName="Red-Blue"', 
+                         paste0('attributes="', type.val, '"'),
+                         'paletteName="Red-Blue"',
                          'labels="site"')
       commandsRun(ovviz.cmd)
-      
+
       ##Get the new node table to get the pie chart nodes
       final.node.table <- RCy3::getTableColumns(table = "node")
       ptm.nodes <- final.node.table[grepl("_", final.node.table$name), ]$SUID
-      
+
       style.name <- "WikiPathways"
       setNodeColorDefault('#FFFFFF', style.name = style.name)
       setNodeBorderColorDefault("#737373", style.name = style.name)
       ##The next line will remove the main node label on pie chart nodes, leaving the omicsvisualizer label for each site
       ##setNodeLabelBypass(ptm.nodes, '')
       setNodeFontSizeBypass(ptm.nodes, 9)
-      
-      loadTableData(cptac.protein, data.key.column = "ensembl", 
+
+      loadTableData(cptac.protein, data.key.column = "ensembl",
                     table = "node", table.key.column = 'Ensembl')
-      RCy3::setNodeColorMapping(table.column = type.val, colors = paletteColorBrewerRdBu, 
+      RCy3::setNodeColorMapping(table.column = type.val, colors = paletteColorBrewerRdBu,
                                 style.name = style.name)
       output$status <- renderText({
         paste("Pie Chart visualization complete for WikiPathway", wpid)
