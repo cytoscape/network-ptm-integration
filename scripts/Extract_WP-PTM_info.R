@@ -11,7 +11,7 @@ library(tidyr)
 library(xml2)
 
 ## Change working dir to local folder containing gpmls.
-setwd("~/Downloads/wikipathways-20250510-gpml-Homo_sapiens/")
+setwd("~/Downloads/wikipathways-20250810-gpml-Homo_sapiens/")
 
 ## Define output dir.
 dir.path <- "~/github/network-ptm-integration/pathways/ptm_info/"
@@ -61,7 +61,7 @@ state_info <- state_info %>%
   mutate(WPID=wpid)
 
 ## Save to combined data frame
-#wp.cptac.ptm.all <- rbind(wp.cptac.ptm.all, state_info)
+wp.cptac.ptm.all <- rbind(wp.cptac.ptm.all, state_info)
 
 ## Export individual files
 file.name <- paste0(wpid, '-ptm.txt')
@@ -76,3 +76,15 @@ write.table(state_info,
 write.table(wp.cptac.ptm.all, 
             paste0(dir.path, "wp-cptac-all-ptm.txt"),
             sep = "\t", row.names = FALSE, quote = FALSE)
+
+## Get stats
+## Number of individual pathways
+
+unique_pw <- wp.cptac.ptm.all %>%
+  select(WPID) %>%
+  distinct()
+
+unique_ptms <- wp.cptac.ptm.all %>%
+  mutate(parent_site=paste0(parentid, "_", position)) %>%
+  select(parent_site, parentsymbol, parentid) %>%
+  distinct()

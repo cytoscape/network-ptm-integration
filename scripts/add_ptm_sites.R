@@ -37,7 +37,7 @@ progenyChoices  <- list_txt_files("../datasets/PROGENy")
 # For the CPTAC cancer type
 cptacChoices <- c("CCRCC", "COAD", "HNSCC", "LSCC", "LUAD", "OV", "PDAC", "UCEC")
 # For the kinase-substrate mapping folder (all .txt files)
-kinasemappingChoices <- list_txt_files("../annotations/kinase-substrate")
+#kinasemappingChoices <- list_txt_files("../annotations/kinase-substrate")
 # For the identifier mapping folder (all .txt files)
 identifiermappingChoices <- list_txt_files("../annotations/id-mapping")
 
@@ -216,8 +216,8 @@ ui <- navbarPage(
                            selected = "WP4806"),
                selectInput("vizMode", "Visualization Mode:",
                            choices = c("Traditional PTM", "Pie Chart")),
-               selectInput("analysisMode", "Analysis Mode:",
-                           choices = c("all", "kinase")),
+               # selectInput("analysisMode", "Analysis Mode:",
+               #             choices = c("all", "kinase")),
                br(),
                actionButton("run", "Run Analysis"),
                textOutput("status")
@@ -255,15 +255,18 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$run, {
-    req(input$wpid, input$vizMode, input$analysisMode, input$phosphoMode,
+    req(input$wpid, input$vizMode, input$phosphoMode,
         input$phosphoFile, input$proteinFile, input$progenyFile,
         input$cptacType)
     
     # Retrieve user selections
     wpid         <- input$wpid
     vizMode      <- input$vizMode        # "Traditional PTM" or "Pie Chart"
-    analysisMode <- input$analysisMode     # "all" or "kinase"
+    #analysisMode <- input$analysisMode     # "all" or "kinase"
     mode <- input$phosphoMode  #which phospho mode
+    
+    #hard-coded mode
+    analysisMode <- "all"
     
     # #This doesn't work, it is displayed AFTER completed analysis
     # output$status <- renderText({
@@ -278,7 +281,7 @@ server <- function(input, output, session) {
     ## -----------------------
     
     ##Import id mapping file from Biomart and kinase-substrate mapping from PSP
-    psp.data <- read.csv("../annotations/kinase-substrate/PSP_Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
+    #psp.data <- read.csv("../annotations/kinase-substrate/PSP_Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
     biomart <- read.csv("../annotations/id-mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t")
 
     cptac.phospho <- read.csv(input$phosphoFile, stringsAsFactors = FALSE, sep = "\t") %>% 
@@ -300,7 +303,7 @@ server <- function(input, output, session) {
       ##Get relevant sites based on positive PROGENy scores
       cptac.progeny.pos <- cptac.progeny %>%
         filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05) %>%
-        mutate(prot_site = paste0(protein, "_", site)) %>% 
+        mutate(prot_site = paste0(protein, "_", site)) %>%
         dplyr::select(symbol, protein, site, prot_site, all_of(type.val), all_of(type.pval))
     }
     
@@ -312,7 +315,7 @@ server <- function(input, output, session) {
     
     if (mode == "Data-driven phosphoproteomics data"){
       cptac.phospho.threshold <- cptac.phospho %>%
-        filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05)
+      filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05)
     }
     
     ## -----------------------
@@ -530,6 +533,11 @@ server <- function(input, output, session) {
                          paste0('attributes="', type.val, '"'),
                          'paletteName="Red-Blue"',
                          'labels="site"')
+      
+      # ovviz.cmd <- paste('ov viz apply inner continuous',
+      #                    paste0('attributes="', type.val, '"'),
+      #                    'paletteName="Red-Blue"', 'rangeMax="3"', 'rangeMin="-3"',
+      #                    'labels="site"')
       commandsRun(ovviz.cmd)
 
       ##Get the new node table to get the pie chart nodes

@@ -1,2 +1,2 @@
 parentid	parentsymbol	position	WPID
-G8JLH9	STAT3	tyr705	WP4018
+P40763	STAT3	tyr705	WP4018
