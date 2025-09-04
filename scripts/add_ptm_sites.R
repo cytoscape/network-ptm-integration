@@ -350,7 +350,6 @@ server <- function(input, output, session) {
     matching.nodes.phospho <- cptac.progeny.pos %>%
       filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
       dplyr::select(symbol, protein, site, prot_site)
-
     }
     
     if (mode == "Data-driven phosphoproteomics data"){
@@ -488,26 +487,18 @@ server <- function(input, output, session) {
       node.layout.pie <- node.layout.pie %>%
         mutate(x.ptm = (x_location + node.width / 2 + 20)) %>%
         mutate(y.ptm = y_location)
-
-      # cptac.phospho.full.ov <- matching.nodes.phospho %>%
-      #   mutate(symbol_ptm = paste0(symbol, "_ptm"))
-      #
+      
       cptac.phospho.full.ov <- cptac.phospho %>%
-        filter(prot_site %in% cptac.progeny.pos$prot_site) %>%
+        filter(prot_site %in% matching.nodes.phospho$prot_site) %>%
         mutate(symbol_ptm = paste0(symbol, "_ptm"))
-
+      
       write.table(cptac.phospho.full.ov,
                   paste0(cytoscapeSampleDataPath, "cptac.phospho.full.txt"),
                   sep = "\t", row.names = FALSE)
-      matching.nodes.prot.pie <- node.table.prot.mapped %>%
-        filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>%
+
+      matching.nodes.prot.pie <- matching.nodes.prot %>%
         mutate(name = paste0(name, "_ptm")) %>%
         dplyr::select(SUID, name)
-
-      # matching.nodes.prot.pie <- node.table.prot.mapped %>%
-      #   # filter(ensembl_peptide_id %in% cptac.progeny.pos$protein) %>%
-      #   mutate(name = paste0(name, "_ptm")) %>%
-      #   dplyr::select(SUID, name)
 
       for (p in matching.nodes.prot.pie$SUID) {
         ptm.name <- matching.nodes.prot.pie$name[matching.nodes.prot.pie$SUID == p]
@@ -531,13 +522,9 @@ server <- function(input, output, session) {
       commandsRun(ovconnect.cmd)
       ovviz.cmd <- paste('ov viz apply inner continuous',
                          paste0('attributes="', type.val, '"'),
-                         'paletteName="Red-Blue"',
+                         'paletteName="Red-Blue"','rangeMax="1.3"', 'rangeMin="-1.3"',
                          'labels="site"')
       
-      # ovviz.cmd <- paste('ov viz apply inner continuous',
-      #                    paste0('attributes="', type.val, '"'),
-      #                    'paletteName="Red-Blue"', 'rangeMax="3"', 'rangeMin="-3"',
-      #                    'labels="site"')
       commandsRun(ovviz.cmd)
 
       ##Get the new node table to get the pie chart nodes
