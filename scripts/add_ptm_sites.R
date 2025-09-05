@@ -60,22 +60,35 @@ ui <- navbarPage(
            ),
            sidebarLayout(
              sidebarPanel(
-               h4("Select Method for Adding Phospho Sites"),
-               selectInput("phosphoMode", "Phospho Site Mode:",
+               h4("Select method for adding phospho sites"),
+               selectInput("phosphoMode", NULL,
                            choices = c("Data-driven PROGENy", "Data-driven phosphoproteomics data", "Manually curated")),
-               h4("Select Data Files"),
+               #uiOutput("extra_inputs"),
+               conditionalPanel(
+                 condition = "input.phosphoMode == 'Data-driven PROGENy'",
+                 selectInput("progenyFile", "PROGENy Data File:",
+                             choices = progenyChoices,
+                             selected = names(progenyChoices)[1]),
+               ),
+               conditionalPanel(
+                 h4("Select p value cutoff for adding phospho sites"),
+                 condition = "input.phosphoMode == 'Data-driven phosphoproteomics data'",
+                 numericInput("pval_threshold", "p value threshold", value = 0.05, min = 0),
+               ),
+               h4("Select data files"),
                selectInput("phosphoFile", "Phosphoproteomics Data File:",
                            choices = phosphodatasetsChoices,
                            selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
                selectInput("proteinFile", "Proteomics Data File:",
                            choices = proteindatasetsChoices,
                            selected = names(proteindatasetsChoices)[grep("protein", names(proteindatasetsChoices), ignore.case = TRUE)[1]]),
-               selectInput("progenyFile", "PROGENy Data File:",
-                           choices = progenyChoices,
-                           selected = names(progenyChoices)[1]),
+               # selectInput("progenyFile", "PROGENy Data File:",
+               #             choices = progenyChoices,
+               #             selected = names(progenyChoices)[1]),
                selectInput("cptacType", "CPTAC Cancer Type:",
                            choices = cptacChoices,
                            selected = names(cptacChoices)[1]),
+               
                # selectInput("kinaseFile", "Kinase-Substrate Mapping File:",
                #             choices = kinasemappingChoices,
                #             selected = names(kinasemappingChoices)[grep("Kinase", names(kinasemappingChoices), ignore.case = TRUE)[1]]),
@@ -238,6 +251,61 @@ server <- function(input, output, session) {
   ## Display selected file names in the "Data Files" tab.
   
   output$selectedFiles <- renderUI({
+    # output$extra_inputs <- renderUI({
+    # req(input$phosphoMode)
+    #   switch(
+    #     input$phosphoMode,
+    #     "Data-driven PROGENy" = tagList(
+    #       selectInput("progenyFile", "PROGENy Data File:",
+    #                   choices = progenyChoices,
+    #                   selected = names(progenyChoices)[1]),
+    #       selectInput("phosphoFile", "Phosphoproteomics Data File:",
+    #                                choices = phosphodatasetsChoices,
+    #                                selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
+    #       selectInput("proteinFile", "Proteomics Data File:",
+    #                   choices = proteindatasetsChoices,
+    #                   selected = names(proteindatasetsChoices)[grep("protein", names(proteindatasetsChoices), ignore.case = TRUE)[1]]),
+    #       selectInput("cptacType", "CPTAC Cancer Type:",
+    #                   choices = cptacChoices,
+    #                   selected = names(cptacChoices)[1]),
+    #     ),
+    #     "Data-driven phosphoproteomics data" = tagList(
+    #       numericInput("pval_threshold", "p value threshold", value = 0.05, min = 0),
+    #       selectInput("phosphoFile", "Phosphoproteomics Data File:",
+    #                   choices = phosphodatasetsChoices,
+    #                   selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
+    #       selectInput("proteinFile", "Proteomics Data File:",
+    #                                 choices = proteindatasetsChoices,
+    #                                 selected = names(proteindatasetsChoices)[grep("protein", names(proteindatasetsChoices), ignore.case = TRUE)[1]]),
+    #       selectInput("cptacType", "CPTAC Cancer Type:",
+    #                                choices = cptacChoices,
+    #                                selected = names(cptacChoices)[1]),
+    #     ),
+    #     "Manually curated" = tagList(
+    #       selectInput("phosphoFile", "Phosphoproteomics Data File:",
+    #                   choices = phosphodatasetsChoices,
+    #                   selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
+    #       selectInput("proteinFile", "Proteomics Data File:",
+    #                   choices = proteindatasetsChoices,
+    #                   selected = names(proteindatasetsChoices)[grep("protein", names(proteindatasetsChoices), ignore.case = TRUE)[1]]),
+    #       selectInput("cptacType", "CPTAC Cancer Type:",
+    #                   choices = cptacChoices,
+    #                   selected = names(cptacChoices)[1]),
+    #     ),
+    #     "Custom data" = tagList(
+    #       selectInput("phosphoFile", "Phosphoproteomics Data File:",
+    #                   choices = phosphodatasetsChoices,
+    #                   selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
+    #       #textInput("organism", "Organism"),
+    #       #numericInput("pval_threshold", "p value threshold", value = 0.05, min = 0),
+    #       selectInput("proteinFile", "Proteomics Data File:",
+    #                   choices = proteindatasetsChoices,
+    #                   selected = names(proteindatasetsChoices)[grep("protein", names(proteindatasetsChoices), ignore.case = TRUE)[1]]),
+    #       #textInput("organism", "Organism"),
+    #       
+    #     ),
+    #     NULL
+    #   )
     tags$ul(style = "list-style-type: none; padding-left: 0;",
             tags$li(style="margin-bottom: 8px;", tags$b("Mode:"), input$phosphoMode),
             tags$li(style="margin-bottom: 8px;", tags$b("Phospho:"), input$phosphoFile),
@@ -255,9 +323,9 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$run, {
-    req(input$wpid, input$vizMode, input$phosphoMode,
-        input$phosphoFile, input$proteinFile, input$progenyFile,
-        input$cptacType)
+    # req(input$wpid, input$vizMode, input$phosphoMode,
+    #     input$phosphoFile, input$proteinFile, input$progenyFile,
+    #     input$cptacType)
     
     # Retrieve user selections
     wpid         <- input$wpid
