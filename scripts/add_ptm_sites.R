@@ -36,6 +36,8 @@ proteindatasetsChoices <- list_txt_files("../datasets/protein")
 progenyChoices  <- list_txt_files("../datasets/PROGENy")
 # For the CPTAC cancer type
 cptacChoices <- c("CCRCC", "COAD", "HNSCC", "LSCC", "LUAD", "OV", "PDAC", "UCEC")
+# For custom data, to select type of protein identifier
+protIdChoices <- c("Ensembl protein", "UniProt")
 # For the kinase-substrate mapping folder (all .txt files)
 #kinasemappingChoices <- list_txt_files("../annotations/kinase-substrate")
 # For the identifier mapping folder (all .txt files)
@@ -57,11 +59,11 @@ ui <- fluidPage(
   ),
   ## Two side-by-side panels
   fluidRow(
-    column(6,
+    column(5,
            wellPanel(
                h4("Phosphosite Mode and Data File Selection"),
                selectInput("phosphoMode", "Select method for adding phospho sites",
-                           choices = c("Data-driven: PROGENy", "Data-driven: phosphoproteomics data", "Manually curated phospho sites", "Custom data")),
+                           choices = c("Data-driven: PROGENy", "Data-driven: CPTAC phosphoproteomics data", "Manually curated phospho sites", "Custom data")),
                conditionalPanel(
                  condition = "input.phosphoMode == 'Data-driven: PROGENy'",
                  selectInput("progenyFile", "PROGENy Data File",
@@ -72,25 +74,38 @@ ui <- fluidPage(
                              selected = names(cptacChoices)[1]),
                ),
                conditionalPanel(
-                 condition = "input.phosphoMode == 'Data-driven: phosphoproteomics data'",
+                 condition = "input.phosphoMode == 'Data-driven: CPTAC phosphoproteomics data'",
                  numericInput("pval_threshold", "Phosphoprotein p val cutoff", value = 0.05, min = 0),
                  selectInput("cptacType", "CPTAC Cancer Type",
                              choices = cptacChoices,
                              selected = names(cptacChoices)[1]),
                ),
                conditionalPanel(
-                 h4("UNDER CONSTRUCTION"),
                  condition = "input.phosphoMode == 'Custom data'",
-                 # numericInput("pval_threshold", "Phosphoprotein p val cutoff", value = 0.05, min = 0),
-                 # selectInput("phosphoFile", "Phosphoproteomics Data File:",
-                 #             choices = phosphodatasetsChoices,
-                 #             selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
-                 # selectInput("proteinFile", "Proteomics Data File:",
-                 #             choices = proteindatasetsChoices,
-                 #             selected = names(proteindatasetsChoices)[grep("protein", names(proteindatasetsChoices), ignore.case = TRUE)[1]]),
-               ),
+                 h4("UNDER CONSTRUCTION"),
+                 textInput("customPhosphoSitePath", "Path to your phosphosite data", value = "", width = NULL,
+                           placeholder = NULL),
+                 # textInput("proteinId", "Substrate (protein) node column header", value = "", width = NULL,
+                 #           placeholder = NULL),
+                 # selectInput("proteinIdType", "Substrate node identifier type",
+                 #             choices = protIdChoices,
+                 #             selected = names(protIdChoices)[1]),
+                 # textInput("phosphoId", "Phosphosite column header", value = "", width = NULL,
+                 #           placeholder = NULL),
+                 hr(),
+                 h4("Files for Data Visualization"),
+                 textInput("customPhosphoDataPath", "Data file path for phosphosite node visualization", value = "", width = NULL,
+                           placeholder = NULL),
+                 textInput("customPhosphoDataColumn", "Data column for phosphosite node visualization", value = "", width = NULL,
+                           placeholder = NULL),
+                 textInput("customProteinDataPath", "Data file path for protein/gene node visualization", value = "", width = NULL,
+                           placeholder = NULL),
+                 textInput("customProteinDataColumn", "Data column for protein/gene node visualization", value = "", width = NULL,
+                           placeholder = NULL),
+                           ),
                conditionalPanel(
                  condition = "input.phosphoMode == 'Manually curated phospho sites'",
+                 h4("Files for Data Visualization"),
                  selectInput("phosphoFile", "Phosphoproteomics Data File",
                              choices = phosphodatasetsChoices,
                              selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
@@ -103,9 +118,9 @@ ui <- fluidPage(
                ),
               )
              ),
-          column(6,
+          column(7,
           wellPanel(
-            h4("Visualization Parameters"),
+            h4("Pathway Visualization"),
               selectInput("wpid", "Pathway model (WikiPathways)",
                 choices = c(
                   "4-hydroxytamoxifen, dexamethasone, and retinoic acids regulation of p27 expression - WP3879 (Homo sapiens)" = "WP3879",
@@ -242,34 +257,42 @@ ui <- fluidPage(
 ## -----------------------
 server <- function(input, output, session) {
   
-  ## Display selected file names in the "Data Files" tab.
+  # ## Display selected file names in the "Data Files" tab.
+  # 
+  # output$selectedFiles <- renderUI({
+  #   tags$ul(style = "list-style-type: none; padding-left: 0;",
+  #           tags$li(style="margin-bottom: 8px;", tags$b("Mode:"), input$phosphoMode),
+  #           tags$li(style="margin-bottom: 8px;", tags$b("Phospho:"), input$phosphoFile),
+  #           tags$li(style="margin-bottom: 8px;", tags$b("Protein:"), input$proteinFile),
+  #           tags$li(style="margin-bottom: 8px;", tags$b("PROGENy:"), input$progenyFile),
+  #           tags$li(style="margin-bottom: 8px;", tags$b("CPTAC Cancer Type:"), input$cptacType)
+  #           # tags$li(style="margin-bottom: 8px;", tags$b("Kinase Substrate:"), input$kinaseFile),
+  #           # tags$li(style="margin-bottom: 8px;", tags$b("BioMart:"), input$biomartFile)
+  #   )
+  # })
   
-  output$selectedFiles <- renderUI({
-    tags$ul(style = "list-style-type: none; padding-left: 0;",
-            tags$li(style="margin-bottom: 8px;", tags$b("Mode:"), input$phosphoMode),
-            tags$li(style="margin-bottom: 8px;", tags$b("Phospho:"), input$phosphoFile),
-            tags$li(style="margin-bottom: 8px;", tags$b("Protein:"), input$proteinFile),
-            tags$li(style="margin-bottom: 8px;", tags$b("PROGENy:"), input$progenyFile),
-            tags$li(style="margin-bottom: 8px;", tags$b("CPTAC Cancer Type:"), input$cptacType)
-            # tags$li(style="margin-bottom: 8px;", tags$b("Kinase Substrate:"), input$kinaseFile),
-            # tags$li(style="margin-bottom: 8px;", tags$b("BioMart:"), input$biomartFile)
-    )
-  })
-  
-  ## Automatically switch to Analysis tab when "Proceed to Analysis" is clicked.
-  observeEvent(input$goToAnalysis, {
-    updateNavbarPage(session, "mainTabs", selected = "Analysis")
-  })
+  # ## Automatically switch to Analysis tab when "Proceed to Analysis" is clicked.
+  # observeEvent(input$goToAnalysis, {
+  #   updateNavbarPage(session, "mainTabs", selected = "Analysis")
+  # })
   
   observeEvent(input$run, {
     req(input$wpid, input$vizMode, input$phosphoMode,
         input$phosphoFile, input$proteinFile)
-    
+
     # Retrieve user selections
     wpid         <- input$wpid
     vizMode      <- input$vizMode        # "Traditional PTM" or "Pie Chart"
     #analysisMode <- input$analysisMode     # "all" or "kinase"
     mode <- input$phosphoMode  #which phospho mode
+    customProteinIdType <- input$proteinIdType
+    customProteinId <- input$proteinId
+    customPhosphoPath <- input$customPhosphoPath
+    customPhosphoId <- input$phosphoId
+    
+    # Testing
+    print(input$proteinIdType)
+    print(input$proteinId)
     
     #hard-coded mode
     analysisMode <- "all"
