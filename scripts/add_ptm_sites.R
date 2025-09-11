@@ -36,8 +36,8 @@ proteindatasetsChoices <- list_txt_files("../datasets/protein")
 progenyChoices  <- list_txt_files("../datasets/PROGENy")
 # For the CPTAC cancer type
 cptacChoices <- c("CCRCC", "COAD", "HNSCC", "LSCC", "LUAD", "OV", "PDAC", "UCEC")
-# For custom data, to select type of protein identifier
-protIdChoices <- c("Ensembl protein", "UniProt")
+# For custom phosphosite data
+phosphositeChoices <- list_txt_files("../datasets/phosphosite")
 # For the kinase-substrate mapping folder (all .txt files)
 #kinasemappingChoices <- list_txt_files("../annotations/kinase-substrate")
 # For the identifier mapping folder (all .txt files)
@@ -83,23 +83,25 @@ ui <- fluidPage(
                conditionalPanel(
                  condition = "input.phosphoMode == 'Custom data'",
                  h4("UNDER CONSTRUCTION"),
-                 textInput("customPhosphoSitePath", "Path to your phosphosite data", value = "", width = NULL,
-                           placeholder = NULL),
-                 # textInput("proteinId", "Substrate (protein) node column header", value = "", width = NULL,
-                 #           placeholder = NULL),
-                 # selectInput("proteinIdType", "Substrate node identifier type",
-                 #             choices = protIdChoices,
-                 #             selected = names(protIdChoices)[1]),
-                 # textInput("phosphoId", "Phosphosite column header", value = "", width = NULL,
+                 # textInput("customPhosphoSitePath", "Path to your phosphosite data, i.e. /Users/username/...", value = "", width = NULL,
                  #           placeholder = NULL),
                  hr(),
                  h4("Files for Data Visualization"),
-                 textInput("customPhosphoDataPath", "Data file path for phosphosite node visualization", value = "", width = NULL,
-                           placeholder = NULL),
+                 selectInput("customPhosphoFile", "Custom Phosphosite Data File",
+                             choices = phosphositeChoices,
+                             selected = NULL),
+                 #textInput("customPhosphoFilePath", "Data file path for phosphosite node visualization", value = "", width = NULL,
+                           #placeholder = NULL),
+                 selectInput("proteinFile", "Proteomics Data File",
+                           choices = proteindatasetsChoices,
+                           selected = names(proteindatasetsChoices)[grep("protein", names(proteindatasetsChoices), ignore.case = TRUE)[1]]),
+                 selectInput("phosphoFile", "Phosphoproteomics Data File",
+                           choices = phosphodatasetsChoices,
+                           selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
                  textInput("customPhosphoDataColumn", "Data column for phosphosite node visualization", value = "", width = NULL,
                            placeholder = NULL),
-                 textInput("customProteinDataPath", "Data file path for protein/gene node visualization", value = "", width = NULL,
-                           placeholder = NULL),
+                 # textInput("customProteinFilePath", "Data file path for protein/gene node visualization", value = "", width = NULL,
+                 #           placeholder = NULL),
                  textInput("customProteinDataColumn", "Data column for protein/gene node visualization", value = "", width = NULL,
                            placeholder = NULL),
                            ),
@@ -257,25 +259,6 @@ ui <- fluidPage(
 ## -----------------------
 server <- function(input, output, session) {
   
-  # ## Display selected file names in the "Data Files" tab.
-  # 
-  # output$selectedFiles <- renderUI({
-  #   tags$ul(style = "list-style-type: none; padding-left: 0;",
-  #           tags$li(style="margin-bottom: 8px;", tags$b("Mode:"), input$phosphoMode),
-  #           tags$li(style="margin-bottom: 8px;", tags$b("Phospho:"), input$phosphoFile),
-  #           tags$li(style="margin-bottom: 8px;", tags$b("Protein:"), input$proteinFile),
-  #           tags$li(style="margin-bottom: 8px;", tags$b("PROGENy:"), input$progenyFile),
-  #           tags$li(style="margin-bottom: 8px;", tags$b("CPTAC Cancer Type:"), input$cptacType)
-  #           # tags$li(style="margin-bottom: 8px;", tags$b("Kinase Substrate:"), input$kinaseFile),
-  #           # tags$li(style="margin-bottom: 8px;", tags$b("BioMart:"), input$biomartFile)
-  #   )
-  # })
-  
-  # ## Automatically switch to Analysis tab when "Proceed to Analysis" is clicked.
-  # observeEvent(input$goToAnalysis, {
-  #   updateNavbarPage(session, "mainTabs", selected = "Analysis")
-  # })
-  
   observeEvent(input$run, {
     req(input$wpid, input$vizMode, input$phosphoMode,
         input$phosphoFile, input$proteinFile)
@@ -285,25 +268,14 @@ server <- function(input, output, session) {
     vizMode      <- input$vizMode        # "Traditional PTM" or "Pie Chart"
     #analysisMode <- input$analysisMode     # "all" or "kinase"
     mode <- input$phosphoMode  #which phospho mode
-    customProteinIdType <- input$proteinIdType
-    customProteinId <- input$proteinId
-    customPhosphoPath <- input$customPhosphoPath
-    customPhosphoId <- input$phosphoId
-    
-    # Testing
-    print(input$proteinIdType)
-    print(input$proteinId)
+    #customPhosphoSitePath <- input$customPhosphoPath
+    #customPhosphoDataColumn <- input$customPhosphoDataColumn
+    #customPhosphoFilePath <- input$customPhosphoFilePath
+    #customProteinDataColumn <- input$customProteinDataColumn
+    #customProteinDataPath <- input$customProteinFilePath
     
     #hard-coded mode
     analysisMode <- "all"
-    
-    # #This doesn't work, it is displayed AFTER completed analysis
-    # output$status <- renderText({
-    #   paste("Starting analysis with WikiPathway ID:", wpid,
-    #         "\nPhospho Mode:", mode,
-    #         "\nVisualization Mode:", vizMode,
-    #         "\nAnalysis Mode:", analysisMode)
-    # })
 
     ## -----------------------
     ## Import Files Based on User Selection
@@ -312,7 +284,14 @@ server <- function(input, output, session) {
     ##Import id mapping file from Biomart and kinase-substrate mapping from PSP
     #psp.data <- read.csv("../annotations/kinase-substrate/PSP_Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
     biomart <- read.csv("../annotations/id-mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t")
-
+    
+    if (mode == "Custom data")
+    {
+      # Testing
+      #data.phospho <- read.csv(input$customPhosphoFilePath, stringsAsFactors = FALSE, sep = "\t")
+      #data.protein <- read.csv(input$customProteinFilePath, stringsAsFactors = FALSE, sep = "\t")
+      #data.phosphosites <- read.csv(input$customPhosphoPath, stringsAsFactors = FALSE, sep = "\t")
+    }
     cptac.phospho <- read.csv(input$phosphoFile, stringsAsFactors = FALSE, sep = "\t") %>% 
       mutate(prot_site = paste0(protein, "_", site))
     
@@ -509,9 +488,9 @@ server <- function(input, output, session) {
       loadTableData(ptms.all.data.site, data.key.column = "SUID", 
                     table = "node", table.key.column = "SUID")
       setNodeLabelMapping('name', style.name = style.name)
-      output$status <- renderText({
-        paste("Traditional PTM visualization complete for WikiPathway", wpid)
-      })
+      # output$status <- renderText({
+      #   paste("Traditional PTM visualization complete for WikiPathway", wpid)
+      # })
      } 
     else if (vizMode == "Pie Chart") {
       node.layout.pie <- node.layout.pie %>%
