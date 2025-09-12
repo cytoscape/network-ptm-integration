@@ -9,6 +9,7 @@ library(shinythemes)
 library(RCy3)
 library(dplyr)
 library(purrr)
+library(ggplot2)
 # Uncomment additional libraries if needed:
 library(stringr)
 # library(RColorBrewer)
@@ -83,25 +84,19 @@ ui <- fluidPage(
                conditionalPanel(
                  condition = "input.phosphoMode == 'Custom data'",
                  h4("UNDER CONSTRUCTION"),
-                 # textInput("customPhosphoSitePath", "Path to your phosphosite data, i.e. /Users/username/...", value = "", width = NULL,
-                 #           placeholder = NULL),
                  hr(),
                  h4("Files for Data Visualization"),
                  selectInput("customPhosphoFile", "Custom Phosphosite Data File",
                              choices = phosphositeChoices,
                              selected = NULL),
-                 #textInput("customPhosphoFilePath", "Data file path for phosphosite node visualization", value = "", width = NULL,
-                           #placeholder = NULL),
                  selectInput("proteinFile", "Proteomics Data File",
                            choices = proteindatasetsChoices,
-                           selected = names(proteindatasetsChoices)[grep("protein", names(proteindatasetsChoices), ignore.case = TRUE)[1]]),
+                           selected = NULL),
                  selectInput("phosphoFile", "Phosphoproteomics Data File",
                            choices = phosphodatasetsChoices,
-                           selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
+                           selected = NULL),
                  textInput("customPhosphoDataColumn", "Data column for phosphosite node visualization", value = "", width = NULL,
                            placeholder = NULL),
-                 # textInput("customProteinFilePath", "Data file path for protein/gene node visualization", value = "", width = NULL,
-                 #           placeholder = NULL),
                  textInput("customProteinDataColumn", "Data column for protein/gene node visualization", value = "", width = NULL,
                            placeholder = NULL),
                            ),
@@ -110,10 +105,10 @@ ui <- fluidPage(
                  h4("Files for Data Visualization"),
                  selectInput("phosphoFile", "Phosphoproteomics Data File",
                              choices = phosphodatasetsChoices,
-                             selected = names(phosphodatasetsChoices)[grep("phospho", names(phosphodatasetsChoices), ignore.case = TRUE)[1]]),
+                             selected = NULL),
                  selectInput("proteinFile", "Proteomics Data File",
                              choices = proteindatasetsChoices,
-                             selected = names(proteindatasetsChoices)[grep("protein", names(proteindatasetsChoices), ignore.case = TRUE)[1]]),
+                             selected = NULL),
                  selectInput("cptacType", "CPTAC Cancer Type",
                              choices = cptacChoices,
                              selected = names(cptacChoices)[1]),
@@ -261,8 +256,8 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   
   observeEvent(input$run, {
-    req(input$wpid, input$vizMode, input$phosphoMode,
-        input$phosphoFile, input$proteinFile)
+    # req(input$wpid, input$vizMode, input$phosphoMode,
+    #     input$phosphoFile, input$proteinFile)
     
     # Retrieve user selections
     wpid         <- input$wpid
@@ -273,47 +268,101 @@ server <- function(input, output, session) {
     #hard-coded mode
     analysisMode <- "all"
 
+    ##Import id mapping file from Biomart and kinase-substrate mapping from PSP
+    #psp.data <- read.csv("../annotations/kinase-substrate/PSP_Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
+    biomart <- read.csv("../annotations/id-mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t")
+ 
     ## -----------------------
     ## Import Files Based on User Selection
     ## -----------------------
     
-    ##Import id mapping file from Biomart and kinase-substrate mapping from PSP
-    #psp.data <- read.csv("../annotations/kinase-substrate/PSP_Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
-    biomart <- read.csv("../annotations/id-mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t")
+    ## Get relevant column header based on cancer type selected. 
+    type.pval <- paste0(input$cptacType, ".pval") 
+    type.val <- paste0(input$cptacType, ".val")
     
-    cptac.phospho <- read.csv(input$phosphoFile, stringsAsFactors = FALSE, sep = "\t") %>% 
-      mutate(protsite = paste0(protein, ":", site)) ## This uses a composite id of Ensembl Protein id and site. Could switch to symbol and site.
-    
-    cptac.protein <- read.csv(input$proteinFile, stringsAsFactors = FALSE, sep = "\t")
-    cptac.progeny <- read.csv(input$progenyFile, stringsAsFactors = FALSE, sep = "\t")
-    idp.pub <- read.csv("~/Downloads/IDPpub_data_10_13_2023/main_results_for_idppub.txt",stringsAsFactors = FALSE, sep = "\t")
+    # cptac.phospho <- read.csv(input$phosphoFile, stringsAsFactors = FALSE, sep = "\t") %>% 
+    #   mutate(protsite = paste0(protein, ":", site)) ## This uses a composite id of Ensembl Protein id and site. Could switch to symbol and site.
+    # 
+    # cptac.protein <- read.csv(input$proteinFile, stringsAsFactors = FALSE, sep = "\t")
     
     ## -----------------------
     ## Preprocess Data from Datasets
     ## -----------------------
-    
-    type.pval <- paste0(input$cptacType, ".pval") ##get relevant column header based on cancer type selected
-    type.val <- paste0(input$cptacType, ".val")
-    
-    ## Data frames of phosphoproteomics and proteomics data for the selected CPTAC cancer type
-    cptac.phospho <- cptac.phospho %>% 
-      dplyr::select(symbol, site, protein, protsite, all_of(type.val), all_of(type.pval))
-    cptac.protein <- cptac.protein %>% 
-      dplyr::select(ensembl, symbol, all_of(type.val), all_of(type.pval)) %>%
-      filter(!is.na(.data[[type.pval]]) & !is.na(.data[[type.pval]]))
   
     if (mode == "Data-driven: PROGENy"){
       ## Get relevant sites based on positive PROGENy scores
+      cptac.progeny <- read.csv(input$progenyFile, stringsAsFactors = FALSE, sep = "\t")
+      ## Data for selected CPTAC type
       cptac.progeny.pos <- cptac.progeny %>%
         filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05) %>%
         mutate(protsite = paste0(protein, ":", site)) %>%
         dplyr::select(symbol, protein, site, protsite, all_of(type.val), all_of(type.pval))
+      
+      ## Read in CPTAC phospho data
+      cptac.phospho <- read.csv("../datasets/phospho/CPTAC_phospho_tn.txt", stringsAsFactors = FALSE, sep = "\t") %>% 
+        mutate(protsite = paste0(protein, ":", site)) ## This uses a composite id of Ensembl Protein id and site. Could switch to symbol and site.
+      ## Data for selected CPTAC type
+      cptac.phospho <- cptac.phospho %>% 
+        dplyr::select(symbol, site, protein, protsite, all_of(type.val), all_of(type.pval))
+      
+      ## Read in CPTAC protein data
+      cptac.protein <- read.csv("../datasets/protein/CPTAC_protein_tn.txt", stringsAsFactors = FALSE, sep = "\t")
+      ## Data for selected CPTAC type
+      cptac.protein <- cptac.protein %>% 
+        dplyr::select(ensembl, symbol, all_of(type.val), all_of(type.pval)) %>%
+        filter(!is.na(.data[[type.pval]]) & !is.na(.data[[type.pval]]))
     }
     
-    if (mode == "Data-driven: phosphoproteomics data"){
+    if (mode == "Data-driven: CPTAC phosphoproteomics data"){
       ## Get relevant sites based on p value threshold on CPTAC phosphoproteomics data
+      cptac.phospho <- read.csv("../datasets/phospho/CPTAC_phospho_tn.txt", stringsAsFactors = FALSE, sep = "\t") %>% 
+        mutate(protsite = paste0(protein, ":", site)) ## This uses a composite id of Ensembl Protein id and site. Could switch to symbol and site.
+      ## Data for selected CPTAC type
+      cptac.phospho <- cptac.phospho %>% 
+        dplyr::select(symbol, site, protein, protsite, all_of(type.val), all_of(type.pval))
+      
+      ## Filter for p value threshold set by user
       cptac.phospho.threshold <- cptac.phospho %>%
       filter(.data[[type.pval]] > 0 & .data[[type.pval]] < input$pval_threshold)
+      
+      ## Read in CPTAC protein data
+      cptac.protein <- read.csv("../datasets/protein/CPTAC_protein_tn.txt", stringsAsFactors = FALSE, sep = "\t")
+      ## Data for selected CPTAC type
+      cptac.protein <- cptac.protein %>% 
+        dplyr::select(ensembl, symbol, all_of(type.val), all_of(type.pval)) %>%
+        filter(!is.na(.data[[type.pval]]) & !is.na(.data[[type.pval]]))
+    }
+    
+    if (mode == "Manually curated phospho sites"){
+      phospho.data <- read.csv(input$phosphoFile, stringsAsFactors = FALSE, sep = "\t") %>%
+        mutate(protsite = paste0(protein, ":", site)) ## This uses a composite id of Ensembl Protein id and site. Could switch to symbol and site.
+
+      protein.data <- read.csv(input$proteinFile, stringsAsFactors = FALSE, sep = "\t")
+      
+      ## If the user selected CPTAC data
+      if (input$proteinFile == "CPTAC_protein_tn.txt"){
+          ## Data for selected CPTAC type
+          protein.data <- protein.data %>% 
+          dplyr::select(ensembl, symbol, all_of(type.val), all_of(type.pval)) %>%
+          filter(!is.na(.data[[type.pval]]) & !is.na(.data[[type.pval]]))
+      }
+      
+      if (input$phosphoFile == "CPTAC_phospho_tn.txt"){
+        ## Data for selected CPTAC type
+        phospho.data <- pphospho.data %>% 
+          dplyr::select(ensembl, symbol, all_of(type.val), all_of(type.pval)) %>%
+          filter(!is.na(.data[[type.pval]]) & !is.na(.data[[type.pval]]))
+      }
+      
+      ## Temp until refactor
+      cptac.phospho <- phospho.data
+      cptac.protein <- protein.data
+    }
+    
+    if (mode == "Custom data"){
+     
+    ## Import and process custom data 
+      
     }
     
     ## -----------------------
@@ -325,7 +374,7 @@ server <- function(input, output, session) {
     ## Get nodes in the pathway, specifically protein nodes, and map them to Ensembl protein ids
     node.table <- RCy3::getTableColumns(table = "node")
     
-    if (mode %in% c("Data-driven: PROGENy", "Data-driven: phosphoproteomics data")) {
+    if (mode %in% c("Data-driven: PROGENy", "Data-driven: CPTAC phosphoproteomics data")) {
       # Remove existing PTM nodes (nodes labeled "p").
       selectNodes(nodes = "p", by.col = "name", preserve.current.selection = FALSE) 
       deleteSelectedNodes()
@@ -350,7 +399,7 @@ server <- function(input, output, session) {
       dplyr::select(symbol, protein, site, protsite)
     }
     
-    if (mode == "Data-driven: phosphoproteomics data"){
+    if (mode == "Data-driven: CPTAC phosphoproteomics data"){
       print(mode)
       matching.nodes.phospho <- cptac.phospho.threshold %>%
         filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
@@ -479,7 +528,7 @@ server <- function(input, output, session) {
       setNodeLabelMapping('name', style.name = style.name)
       
       output$status <- renderText({
-        paste("Visualization complete for", wpid)
+        paste("Visualization complete for", wpid, mode, " mode.")
       })
       
      } 
@@ -535,14 +584,14 @@ server <- function(input, output, session) {
       setNodeColorDefault('#FFFFFF', style.name = style.name)
       setNodeBorderColorDefault("#737373", style.name = style.name)
       ## The next line will remove the main node label on pie chart nodes, leaving the omicsvisualizer label for each site
-      ##setNodeLabelBypass(ptm.nodes, '')
+      setNodeLabelBypass(ptm.nodes, '')
       setNodeFontSizeBypass(ptm.nodes, 9)
 
       loadTableData(cptac.protein, data.key.column = "ensembl", table = "node", table.key.column = "Ensembl")
       RCy3::setNodeColorMapping(table.column = type.val, colors = paletteColorBrewerRdBu,
                                 style.name = style.name)
       output$status <- renderText({
-        paste("Pie Chart visualization complete for", wpid)
+        paste("Pie Chart visualization complete for", wpid, mode, " mode.")
       })
     }
     } ##end if non-zero ptms
