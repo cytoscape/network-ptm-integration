@@ -53,9 +53,9 @@ ui <- fluidPage(
   
   wellPanel(
     # h3("Introduction"),
-    p("This tool allows you to add phosphorylation sites to proteins in WikiPathways models in Cytoscape, and to visualize data on ptms and parent nodes."),
+    p("This tool allows you to add phosphorylation sites to proteins in WikiPathways models in Cytoscape, and to visualize data on phosphosites and parent nodes."),
     p("Phosphosites can be added from data (PROGENy pathway scores for CPTAC data, CPTAC phosphoproteomics data, custom data), or manually curated phosphosites already present in WikiPathways models can be used directly for data visualization. 
-             For the CPTAC phosphoproteomics and PROGENy modes, the CPTAC pan-cancer phosphoproteomics and proteomics data is used by default for visualization."),
+            For the CPTAC phosphoproteomics and PROGENy modes, the CPTAC pan-cancer phosphoproteomics and proteomics data are used by default for visualization."),
     p("For details on the required format of custom data, see the ", tags$a("README", href="https://github.com/cytoscape/network-ptm-integration/blob/main/README.md", target="_blank", rel = "noopener noreferrer", onclick = "window.open(this.href, '_blank'); return false;"), ".")
   ),
   ## Two side-by-side panels
