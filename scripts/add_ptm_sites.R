@@ -41,7 +41,7 @@ phosphositeChoices <- list_txt_files("../datasets/phosphosite")
 # For the kinase-substrate mapping folder (all .txt files)
 #kinasemappingChoices <- list_txt_files("../annotations/kinase-substrate")
 # For the identifier mapping folder (all .txt files)
-identifiermappingChoices <- list_txt_files("../annotations/id-mapping")
+#identifiermappingChoices <- list_txt_files("../annotations/id-mapping")
 
 ## -----------------------
 ## Shiny UI
@@ -250,7 +250,8 @@ ui <- fluidPage(
           )
   ),
   wellPanel(                     
-    h4("Status")
+    h4("Status"),
+    textOutput("status")
   )
 )
 
@@ -262,17 +263,12 @@ server <- function(input, output, session) {
   observeEvent(input$run, {
     req(input$wpid, input$vizMode, input$phosphoMode,
         input$phosphoFile, input$proteinFile)
-
+    
     # Retrieve user selections
     wpid         <- input$wpid
     vizMode      <- input$vizMode        # "Traditional PTM" or "Pie Chart"
     #analysisMode <- input$analysisMode     # "all" or "kinase"
-    mode <- input$phosphoMode  #which phospho mode
-    #customPhosphoSitePath <- input$customPhosphoPath
-    #customPhosphoDataColumn <- input$customPhosphoDataColumn
-    #customPhosphoFilePath <- input$customPhosphoFilePath
-    #customProteinDataColumn <- input$customProteinDataColumn
-    #customProteinDataPath <- input$customProteinFilePath
+    mode <- input$phosphoMode  # which method for adding phospho sites
     
     #hard-coded mode
     analysisMode <- "all"
@@ -285,21 +281,12 @@ server <- function(input, output, session) {
     #psp.data <- read.csv("../annotations/kinase-substrate/PSP_Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
     biomart <- read.csv("../annotations/id-mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t")
     
-    if (mode == "Custom data")
-    {
-      # Testing
-      #data.phospho <- read.csv(input$customPhosphoFilePath, stringsAsFactors = FALSE, sep = "\t")
-      #data.protein <- read.csv(input$customProteinFilePath, stringsAsFactors = FALSE, sep = "\t")
-      #data.phosphosites <- read.csv(input$customPhosphoPath, stringsAsFactors = FALSE, sep = "\t")
-    }
     cptac.phospho <- read.csv(input$phosphoFile, stringsAsFactors = FALSE, sep = "\t") %>% 
-      mutate(prot_site = paste0(protein, "_", site))
+      mutate(protsite = paste0(protein, ":", site)) ## This uses a composite id of Ensembl Protein id and site. Could switch to symbol and site.
     
     cptac.protein <- read.csv(input$proteinFile, stringsAsFactors = FALSE, sep = "\t")
     cptac.progeny <- read.csv(input$progenyFile, stringsAsFactors = FALSE, sep = "\t")
     idp.pub <- read.csv("~/Downloads/IDPpub_data_10_13_2023/main_results_for_idppub.txt",stringsAsFactors = FALSE, sep = "\t")
-    # psp.data <- read.csv(input$kinaseFile, stringsAsFactors = FALSE, sep = "\t")
-    # biomart <- read.csv(input$biomartFile, stringsAsFactors = FALSE, sep = "\t")
     
     ## -----------------------
     ## Preprocess Data from Datasets
@@ -307,22 +294,24 @@ server <- function(input, output, session) {
     
     type.pval <- paste0(input$cptacType, ".pval") ##get relevant column header based on cancer type selected
     type.val <- paste0(input$cptacType, ".val")
-  
-    if (mode == "Data-driven: PROGENy"){
-      ##Get relevant sites based on positive PROGENy scores
-      cptac.progeny.pos <- cptac.progeny %>%
-        filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05) %>%
-        mutate(prot_site = paste0(protein, "_", site)) %>%
-        dplyr::select(symbol, protein, site, prot_site, all_of(type.val), all_of(type.pval))
-    }
     
+    ## Data frames of phosphoproteomics and proteomics data for the selected CPTAC cancer type
     cptac.phospho <- cptac.phospho %>% 
-      dplyr::select(symbol, site, protein, prot_site, all_of(type.val), all_of(type.pval))
+      dplyr::select(symbol, site, protein, protsite, all_of(type.val), all_of(type.pval))
     cptac.protein <- cptac.protein %>% 
       dplyr::select(ensembl, symbol, all_of(type.val), all_of(type.pval)) %>%
       filter(!is.na(.data[[type.pval]]) & !is.na(.data[[type.pval]]))
+  
+    if (mode == "Data-driven: PROGENy"){
+      ## Get relevant sites based on positive PROGENy scores
+      cptac.progeny.pos <- cptac.progeny %>%
+        filter(.data[[type.pval]] > 0 & .data[[type.pval]] < 0.05) %>%
+        mutate(protsite = paste0(protein, ":", site)) %>%
+        dplyr::select(symbol, protein, site, protsite, all_of(type.val), all_of(type.pval))
+    }
     
     if (mode == "Data-driven: phosphoproteomics data"){
+      ## Get relevant sites based on p value threshold on CPTAC phosphoproteomics data
       cptac.phospho.threshold <- cptac.phospho %>%
       filter(.data[[type.pval]] > 0 & .data[[type.pval]] < input$pval_threshold)
     }
@@ -358,14 +347,14 @@ server <- function(input, output, session) {
     ## Get the relevant phospho sites from PROGENy that match the proteins in the node table
     matching.nodes.phospho <- cptac.progeny.pos %>%
       filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
-      dplyr::select(symbol, protein, site, prot_site)
+      dplyr::select(symbol, protein, site, protsite)
     }
     
     if (mode == "Data-driven: phosphoproteomics data"){
       print(mode)
       matching.nodes.phospho <- cptac.phospho.threshold %>%
         filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
-        dplyr::select(symbol, protein, site, prot_site)
+        dplyr::select(symbol, protein, site, protsite)
       }
     
     ## Get node positions for all protein nodes
@@ -395,8 +384,8 @@ server <- function(input, output, session) {
       psp.data.human.mapped <- merge(psp.data.human, biomart, by.x = "SUB_ACC_ID", by.y = "uniprotswissprot") %>%
         mutate(substrate_ensembl_gene_id = ensembl_gene_id) %>%
         mutate(substrate_peptide_id = ensembl_peptide_id) %>%
-        mutate(prot_site = paste0(substrate_peptide_id, "_", SUB_MOD_RSD)) %>%
-        dplyr::select(GENE, KINASE, KIN_ACC_ID, substrate_ensembl_gene_id, SUB_ACC_ID, substrate_peptide_id, prot_site, SUB_MOD_RSD)
+        mutate(protsite = paste0(substrate_peptide_id, ":", SUB_MOD_RSD)) %>%
+        dplyr::select(GENE, KINASE, KIN_ACC_ID, substrate_ensembl_gene_id, SUB_ACC_ID, substrate_peptide_id, protsite, SUB_MOD_RSD)
       
       ## Add Ensembl gene id for kinase
       psp.data.human.mapped <- merge(psp.data.human.mapped, biomart, by.x = "KIN_ACC_ID", by.y = "uniprotswissprot") %>%
@@ -404,14 +393,14 @@ server <- function(input, output, session) {
       
       ## Get filtered list of phospho sites by filtering for those with kinases on the pw.
       filtered.ptms <- psp.data.human.mapped %>%
-        filter(prot_site %in% matching.nodes.phospho$prot_site) %>%
+        filter(protsite %in% matching.nodes.phospho$protsite) %>%
         filter(kin_ensembl_gene_id %in% node.table.prot$Ensembl) %>%
-        dplyr::select(prot_site)
+        dplyr::select(protsite)
       
       filtered.ptms <- unique(filtered.ptms)
     
       matching.nodes.phospho <- matching.nodes.phospho %>%
-        filter(prot_site %in% filtered.ptms$prot_site)
+        filter(protsite %in% filtered.ptms$protsite)
     }
     
     ## -----------------------------
@@ -453,9 +442,9 @@ server <- function(input, output, session) {
         message("Processing protein (Traditional): ", prot)
         phospho.nodes <- site.table %>% 
           filter(protein == prot) %>% 
-          dplyr::select(prot_site)
+          dplyr::select(protsite)
         phospho.nodes <- head(phospho.nodes, 4)
-        suids <- addCyNodes(node.names = phospho.nodes$prot_site, skip.duplicate.names = FALSE)
+        suids <- addCyNodes(node.names = phospho.nodes$protsite, skip.duplicate.names = FALSE)
         ptms <- data.frame()
         for (l in suids) {
           ptms <- rbind(ptms, l)
@@ -477,20 +466,22 @@ server <- function(input, output, session) {
       setNodeHeightBypass(ptms.all$SUID, 20)
       loadTableData(cptac.protein, data.key.column = "ensembl", 
                     table = "node", table.key.column = 'Ensembl')
-      loadTableData(cptac.phospho, data.key.column = "prot_site", 
+      loadTableData(cptac.phospho, data.key.column = "protsite", 
                     table = "node", table.key.column = 'shared name')
       RCy3::setNodeColorMapping(table.column = type.val, colors = paletteColorBrewerRdBu, 
                                 style.name = style.name)
-      ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == prot_site))
+      ptms.all.data <- inner_join(ptms.all, cptac.phospho, by = join_by(name == protsite))
       ptms.all.data.site <- ptms.all.data %>%
         dplyr::select(SUID, site) %>%
         rename(name = site)
       loadTableData(ptms.all.data.site, data.key.column = "SUID", 
                     table = "node", table.key.column = "SUID")
       setNodeLabelMapping('name', style.name = style.name)
-      # output$status <- renderText({
-      #   paste("Traditional PTM visualization complete for WikiPathway", wpid)
-      # })
+      
+      output$status <- renderText({
+        paste("Visualization complete for", wpid)
+      })
+      
      } 
     else if (vizMode == "Pie Chart") {
       node.layout.pie <- node.layout.pie %>%
@@ -498,7 +489,7 @@ server <- function(input, output, session) {
         mutate(y.ptm = y_location)
       
       cptac.phospho.full.ov <- cptac.phospho %>%
-        filter(prot_site %in% matching.nodes.phospho$prot_site) %>%
+        filter(protsite %in% matching.nodes.phospho$protsite) %>%
         mutate(symbol_ptm = paste0(symbol, "_ptm"))
       
       write.table(cptac.phospho.full.ov,
@@ -543,16 +534,15 @@ server <- function(input, output, session) {
       style.name <- "WikiPathways"
       setNodeColorDefault('#FFFFFF', style.name = style.name)
       setNodeBorderColorDefault("#737373", style.name = style.name)
-      ##The next line will remove the main node label on pie chart nodes, leaving the omicsvisualizer label for each site
+      ## The next line will remove the main node label on pie chart nodes, leaving the omicsvisualizer label for each site
       ##setNodeLabelBypass(ptm.nodes, '')
       setNodeFontSizeBypass(ptm.nodes, 9)
 
-      loadTableData(cptac.protein, data.key.column = "ensembl",
-                    table = "node", table.key.column = 'Ensembl')
+      loadTableData(cptac.protein, data.key.column = "ensembl", table = "node", table.key.column = "Ensembl")
       RCy3::setNodeColorMapping(table.column = type.val, colors = paletteColorBrewerRdBu,
                                 style.name = style.name)
       output$status <- renderText({
-        paste("Pie Chart visualization complete for WikiPathway", wpid)
+        paste("Pie Chart visualization complete for", wpid)
       })
     }
     } ##end if non-zero ptms
@@ -572,7 +562,7 @@ server <- function(input, output, session) {
       ## The proteomics data has the ptm site information in a different format, i.e. S233 vs ser233.
       node.table.ptm <- node.table %>% 
         filter(ptm == 'p') %>%
-        mutate(data_mapping_id=paste0(parentid, "_", position)) %>% 
+        mutate(data_mapping_id=paste0(parentid, ":", position)) %>% 
         mutate(data_mapping_id = str_replace(data_mapping_id, "ser", "S"),
                data_mapping_id = str_replace(data_mapping_id, "thr", "T"),
                data_mapping_id = str_replace(data_mapping_id, "tyr", "Y")) %>%
@@ -604,10 +594,10 @@ server <- function(input, output, session) {
       }
     
       cptac.phospho.mapped <- merge(cptac.phospho, biomart, by.x = "protein", by.y = "ensembl_peptide_id") %>%
-        mutate(prot_site=paste0(uniprotswissprot, "_", site))
+        mutate(protsite=paste0(uniprotswissprot, ":", site))
       
       ## Load phosphoproteomics and proteomics data into Cytoscape, using the newly added data_mapping_id column.
-      loadTableData(cptac.phospho.mapped, data.key.column="prot_site", "node", table.key.column = 'data_mapping_id') 
+      loadTableData(cptac.phospho.mapped, data.key.column="protsite", "node", table.key.column = 'data_mapping_id') 
       loadTableData(cptac.protein, data.key.column="ensembl", "node", table.key.column = "Ensembl")
       
       ## Set visual style
