@@ -21,7 +21,13 @@ This app is designed to facilitate exploration of proteomics and phosphoproteomi
 1. Launch Cytoscape on your local machine.
 2. Then launch the Shiny App by running the R script containing the app code in R or RStudio.
 
-## Requirements for custom data - UNDER CONSTRUCTION
+## Using custom data
+Custom data files must be located in the dirs corresponding to the type of data:
+- Phosphoproteomics data: in <code>datasets/phospho</code>
+- Proteomics data: in <code>datasets/protein</code>
+- Phosphosite data: in <code>datasets/phosphosite</code>
+
+### Formatting requirements for custom data - UNDER CONSTRUCTION
 You can use custom data to define the phosphosites to add to the pathway, as well as custom proteomics and phosphoproteomics data. 
 
 Phosphosite and phosphoproteomics data: 
