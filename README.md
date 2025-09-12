@@ -12,6 +12,9 @@ This app is designed to facilitate exploration of proteomics and phosphoproteomi
    - Traditional PTM: Places up to four PTM nodes around each parent protein node.
    - Pie Chart: Creates one pie chart visualization of multiple phospho sites per parent protein node.
 
+<img src="assets/TradViz.png" width="400" />
+<img src="assets/PieViz.png" width="400" />
+
 ## Prerequisites
 
 - Install Cytoscape. (See https://cytoscape.org/download.html)
