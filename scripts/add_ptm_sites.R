@@ -64,7 +64,7 @@ ui <- fluidPage(
            wellPanel(
                h4("Phosphosite Mode and Data File Selection"),
                selectInput("phosphoMode", "Select method for adding phospho sites",
-                           choices = c("Data-driven: PROGENy", "Data-driven: CPTAC phosphoproteomics data", "Manually curated phospho sites", "Custom data")),
+                           choices = c("Data-driven: PROGENy", "Data-driven: CPTAC phosphoproteomics data", "Data-driven: Custom data", "Manually curated phospho sites")),
                conditionalPanel(
                  condition = "input.phosphoMode == 'Data-driven: PROGENy'",
                  selectInput("progenyFile", "PROGENy Data File",
@@ -82,7 +82,7 @@ ui <- fluidPage(
                              selected = names(cptacChoices)[1]),
                ),
                conditionalPanel(
-                 condition = "input.phosphoMode == 'Custom data'",
+                 condition = "input.phosphoMode == 'Data-driven: Custom data'",
                  h4("UNDER CONSTRUCTION"),
                  hr(),
                  h4("Files for Data Visualization"),
@@ -359,7 +359,7 @@ server <- function(input, output, session) {
       cptac.protein <- protein.data
     }
     
-    if (mode == "Custom data"){
+    if (mode == "Data-driven: Custom data"){
      
     ## Import and process custom data 
       
@@ -374,25 +374,22 @@ server <- function(input, output, session) {
     ## Get nodes in the pathway, specifically protein nodes, and map them to Ensembl protein ids
     node.table <- RCy3::getTableColumns(table = "node")
     
-    if (mode %in% c("Data-driven: PROGENy", "Data-driven: CPTAC phosphoproteomics data")) {
+    if (mode %in% c("Data-driven: PROGENy", "Data-driven: CPTAC phosphoproteomics data", "Data-driven: Custom data")) {
       # Remove existing PTM nodes (nodes labeled "p").
       selectNodes(nodes = "p", by.col = "name", preserve.current.selection = FALSE) 
       deleteSelectedNodes()
-    
-    ## -----------------------------
-    ## Common Steps: Node & Data Setup
-    ## -----------------------------
       
+    ## Get the network node table
     node.table.prot <- node.table %>% 
       filter(Type %in% c("Protein", "GeneProduct")) %>%
         dplyr::select(SUID, name, XrefId, Ensembl)
     
+    ## Add protein identifiers to node table
     node.table.prot.mapped <- merge(node.table.prot, biomart, by.x = "Ensembl", by.y = "ensembl_gene_id") %>%
       filter(ensembl_peptide_id != "") %>%
       filter(uniprotswissprot != "")
     
     if (mode == "Data-driven: PROGENy"){
-      print(mode)
     ## Get the relevant phospho sites from PROGENy that match the proteins in the node table
     matching.nodes.phospho <- cptac.progeny.pos %>%
       filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
@@ -400,7 +397,7 @@ server <- function(input, output, session) {
     }
     
     if (mode == "Data-driven: CPTAC phosphoproteomics data"){
-      print(mode)
+      ## Get the relevant phospho sites from CPTAC phospho data that match the proteins in the node table
       matching.nodes.phospho <- cptac.phospho.threshold %>%
         filter(protein %in% node.table.prot.mapped$ensembl_peptide_id) %>%
         dplyr::select(symbol, protein, site, protsite)
@@ -513,6 +510,8 @@ server <- function(input, output, session) {
       setNodeFontSizeBypass(ptms.all$SUID, 9)
       setNodeWidthBypass(ptms.all$SUID, 35)
       setNodeHeightBypass(ptms.all$SUID, 20)
+      
+      ## To-Do: Refactor to make data frames general
       loadTableData(cptac.protein, data.key.column = "ensembl", 
                     table = "node", table.key.column = 'Ensembl')
       loadTableData(cptac.phospho, data.key.column = "protsite", 
