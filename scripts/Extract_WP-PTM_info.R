@@ -11,7 +11,7 @@ library(tidyr)
 library(xml2)
 
 ## Change working dir to local folder containing gpmls.
-setwd("~/Downloads/wikipathways-20250810-gpml-Homo_sapiens/")
+setwd("~/Downloads/wikipathways-20260210-gpml-Homo_sapiens/")
 
 ## Define output dir.
 dir.path <- "~/github/network-ptm-integration/pathways/ptm_info/"
@@ -35,7 +35,7 @@ if (length(states) > 0){
     comment_text <- xml_text(comment_node)
 
     # Skip this <State> if the comment doesn't contain 'parentid='
-    if (is.na(comment_text) || !str_detect(comment_text, "parentid=")) {
+    if (is.na(comment_text) || !str_detect(comment_text, "parentid=") || !str_detect(comment_text, "ptm=p")) {
       return(NULL)
     }
     
@@ -56,7 +56,7 @@ if (length(states) > 0){
 if ("parentid" %in% colnames(state_info)){
 state_info <- state_info %>%
   filter(parentid != "") %>%
-  select(parentid, parentsymbol, position) %>%
+  select(parentid, parentsymbol, position, ptm) %>%
   distinct() %>%
   mutate(WPID=wpid)
 

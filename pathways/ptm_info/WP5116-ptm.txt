@@ -1,2 +1,2 @@
-parentid	parentsymbol	position	WPID
-P0DTD2	orf9b	ser53	WP5116
+parentid	parentsymbol	position	ptm	WPID
+P0DTD2	orf9b	ser53	p	WP5116

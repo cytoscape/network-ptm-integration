@@ -1,2 +1,2 @@
-parentid	parentsymbol	position	WPID
-P40763	STAT3	tyr705	WP4018
+parentid	parentsymbol	position	ptm	WPID
+P40763	STAT3	tyr705	p	WP4018
