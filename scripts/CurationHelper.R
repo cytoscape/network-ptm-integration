@@ -29,7 +29,7 @@ dir.path <- "../pathways/ptm_info/"
 ###############
 
 ## Read in PSP data
-psp.data <- read.csv("../annotations/kinase-substrate/PSP_Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
+psp.data <- read.csv("../Kinase_Substrate_Dataset.txt", stringsAsFactors = FALSE, sep = "\t")
 
 ## Read in local BioMART file
 biomart <- read.csv("../annotations/id-mapping/ensembl_mappings.txt", stringsAsFactors = FALSE, sep = "\t") %>%
@@ -39,7 +39,7 @@ biomart <- read.csv("../annotations/id-mapping/ensembl_mappings.txt", stringsAsF
 
 psp.data.human <- psp.data %>%
   filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human" & IN_VIVO_RXN == "X") %>%
-  dplyr::select(GENE, KINASE, KIN_ACC_ID, SUBSTRATE, SUB_ACC_ID, SUB_GENE_ID, SUB_GENE, SUB_MOD_RSD, SITE_...7_AA) %>%
+  dplyr::select(GENE, KINASE, KIN_ACC_ID, SUBSTRATE, SUB_ACC_ID, SUB_GENE_ID, SUB_GENE, SUB_MOD_RSD, SITE_...7_AA, SITE_GRP_ID) %>%
   mutate(SUB_MOD_RSD_2 = case_when(
     str_starts(SUB_MOD_RSD, "S") ~ str_replace(SUB_MOD_RSD, "^S", "ser"),
     str_starts(SUB_MOD_RSD, "T") ~ str_replace(SUB_MOD_RSD, "^T", "thr"),
@@ -51,14 +51,14 @@ psp.data.human.full <- psp.data %>%
  filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human")
 
 ## Open the relevant WP in Cytoscape using rWikiPathways
-wp = "WP4806"
+wp = "WP4262"
 openwp.cmd <- paste0('wikipathways import-as-pathway id="', wp, '"')
 RCy3::commandsRun(openwp.cmd)
 
 ## Get the full node table for the pathway
 node.table <- RCy3::getTableColumns(table = "node")
 
-## Select the ptm node info
+## Get the gene product node info
 node.table.gp <- node.table %>% 
   filter(Type %in% c("Protein", "GeneProduct")) %>%
   dplyr::select(SUID, name, XrefId, Ensembl)
@@ -70,7 +70,7 @@ curation.nodes <- psp.data.human %>%
   filter (SUB_ACC_ID %in% node.table.gp.mapped$uniprotswissprot) %>%
   filter (KIN_ACC_ID %in% node.table.gp.mapped$uniprotswissprot) %>%
   mutate (comment = paste0("parentid=",SUB_ACC_ID,"; parentsymbol=",SUBSTRATE,"; site=",SITE_...7_AA,"; position=",
-                           SUB_MOD_RSD_2,"; ptm=p; direction="))
+                           SUB_MOD_RSD_2,"; "sitegrpid="",SITE_GRP_ID,"; ptm=p; direction="))
 
 curation.nodes.suid <- merge(curation.nodes, node.table.gp.mapped, by.x ="SUB_ACC_ID", by.y ="uniprotswissprot") %>%
   dplyr::select(SUID) %>% 
@@ -79,10 +79,10 @@ curation.nodes.suid <- merge(curation.nodes, node.table.gp.mapped, by.x ="SUB_AC
 setNodeColorBypass(curation.nodes.suid, '#FF7799')
 
 ## Manually enter a substrate to print only those rows
-substrate = "CCND1"
+substrate = "BRAF"
 substrate_subset <- curation.nodes %>%
   filter(SUB_GENE == substrate) %>%
-  select(GENE, SUB_GENE, SUB_MOD_RSD_2, comment)
+  dplyr::select(GENE, SUB_GENE, SUB_MOD_RSD_2, comment)
 print(substrate_subset)
 
 ############
