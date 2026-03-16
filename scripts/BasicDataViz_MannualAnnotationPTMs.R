@@ -113,6 +113,7 @@ loadTableData(cptac.protein, data.key.column="ensembl", "node", table.key.column
 style.name = "WikiPathways"
 setNodeColorDefault('#FFFFFF', style.name = style.name)
 setNodeBorderColorDefault("#737373", style.name = style.name)
+setNodeWidthBypass(ptm.nodes$SUID, 27)
 
 ## Map node color to HNSCC.val (Head and neck squamous cell carcinoma)
 RCy3::setNodeColorMapping('HNSCC.val', colors=paletteColorBrewerRdBu, style.name = style.name) 
