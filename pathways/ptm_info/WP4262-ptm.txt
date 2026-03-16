@@ -1,4 +1,5 @@
 parentid	parentsymbol	position	ptm	WPID
+P15056	BRAF	ser614	p	WP4262
 P35222	CTNNB1	ser33	p	WP4262
 P35222	CTNNB1	thr41	p	WP4262
 Q02750	MAP2K1	ser218	p	WP4262

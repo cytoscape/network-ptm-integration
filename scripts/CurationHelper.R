@@ -51,7 +51,7 @@ psp.data.human.full <- psp.data %>%
  filter(KIN_ORGANISM == "human" & SUB_ORGANISM == "human")
 
 ## Open the relevant WP in Cytoscape using rWikiPathways
-wp = "WP4262"
+wp = "WP4241"
 openwp.cmd <- paste0('wikipathways import-as-pathway id="', wp, '"')
 RCy3::commandsRun(openwp.cmd)
 
@@ -70,7 +70,7 @@ curation.nodes <- psp.data.human %>%
   filter (SUB_ACC_ID %in% node.table.gp.mapped$uniprotswissprot) %>%
   filter (KIN_ACC_ID %in% node.table.gp.mapped$uniprotswissprot) %>%
   mutate (comment = paste0("parentid=",SUB_ACC_ID,"; parentsymbol=",SUBSTRATE,"; site=",SITE_...7_AA,"; position=",
-                           SUB_MOD_RSD_2,"; "sitegrpid="",SITE_GRP_ID,"; ptm=p; direction="))
+                           SUB_MOD_RSD_2,"; sitegrpid=",SITE_GRP_ID,"; ptm=p; direction="))
 
 curation.nodes.suid <- merge(curation.nodes, node.table.gp.mapped, by.x ="SUB_ACC_ID", by.y ="uniprotswissprot") %>%
   dplyr::select(SUID) %>% 
@@ -79,7 +79,7 @@ curation.nodes.suid <- merge(curation.nodes, node.table.gp.mapped, by.x ="SUB_AC
 setNodeColorBypass(curation.nodes.suid, '#FF7799')
 
 ## Manually enter a substrate to print only those rows
-substrate = "BRAF"
+substrate = "MAPKAP1"
 substrate_subset <- curation.nodes %>%
   filter(SUB_GENE == substrate) %>%
   dplyr::select(GENE, SUB_GENE, SUB_MOD_RSD_2, comment)

@@ -1,6 +1,6 @@
 ###############
 
-## Extract ptm info from CPTAC pathways
+## Extract ptm info from WP pathways
 
 ###############
 ## Setup
@@ -10,17 +10,18 @@ library(purrr)
 library(tidyr)
 library(xml2)
 
-## Change working dir to local folder containing gpmls.
-setwd("~/Downloads/wikipathways-20260210-gpml-Homo_sapiens/")
+## Change working dir to local folder containing gpmls for latest release
+setwd("~/Downloads/wikipathways-20260310-gpml-Homo_sapiens/")
 
 ## Define output dir.
 dir.path <- "~/github/network-ptm-integration/pathways/ptm_info/"
+
 
 #files <- c("Hs_Melanoma_WP4685_20250303.gpml", "Hs_MAPK_signaling_WP382_20250303.gpml") ##manually defined list
 files <- list.files()
 
 ## Define combined data frame
-wp.cptac.ptm.all <- data.frame() ##for combined table
+wp.ptm.all <- data.frame() ##for combined table
 
 for (f in files) {
 print(f)
@@ -61,7 +62,7 @@ state_info <- state_info %>%
   mutate(WPID=wpid)
 
 ## Save to combined data frame
-wp.cptac.ptm.all <- rbind(wp.cptac.ptm.all, state_info)
+wp.ptm.all <- rbind(wp.ptm.all, state_info)
 
 ## Export individual files
 file.name <- paste0(wpid, '-ptm.txt')
@@ -73,18 +74,20 @@ write.table(state_info,
 }
 
 ## Export combined file
-write.table(wp.cptac.ptm.all, 
-            paste0(dir.path, "wp-cptac-all-ptm.txt"),
+write.table(wp.ptm.all, 
+            paste0(dir.path, "wp-all-ptm.txt"),
             sep = "\t", row.names = FALSE, quote = FALSE)
 
 ## Get stats
-## Number of individual pathways
-
-unique_pw <- wp.cptac.ptm.all %>%
+## Number of unique pathways
+unique_pw <- wp.ptm.all %>%
   select(WPID) %>%
   distinct()
+print(nrow(unique_pw))
 
-unique_ptms <- wp.cptac.ptm.all %>%
+## Number of unique sites
+unique_ptms <- wp.ptm.all %>%
   mutate(parent_site=paste0(parentid, "_", position)) %>%
   select(parent_site, parentsymbol, parentid) %>%
   distinct()
+print(nrow(unique_ptms))
